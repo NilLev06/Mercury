@@ -4,8 +4,8 @@ The brain (reflex + looming + goal/flow) navigates to the goal in
 kinematic mode; the viewer only visualizes. Esc closes the window.
 
 Usage:
-    python scripts/fly_mode.py --seed 0
-    python scripts/fly_mode.py --seed 5 --max_episodes 3
+    mjpython -m scripts.fly_mode --seed 0
+    mjpython -m scripts.fly_mode --seed 5 --max_episodes 3
 """
 import argparse
 import sys
@@ -17,6 +17,7 @@ import mujoco.viewer  # noqa: F401
 
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
+from fly_brain_rc.sim.kinematics import BicycleState
 from scripts.run_sim import build_brain
 
 
@@ -29,11 +30,12 @@ def soft_reset(env, brain):
     env.heading = 0.0
     env._w_cmd = 0.0
     env._w_cmd_prev = 0.0
+    env._contact_active = False
     for i in range(env.m.nq):
         d.qpos[i] = 0.0
     d.qpos[2] = 0.05
     d.qpos[3] = 1.0
-    d.qpos[6] = 1.0
+    env.state = BicycleState()
     env._sync_kinematic()
     return brain
 
@@ -63,6 +65,7 @@ def main():
         viewer.cam.elevation = -55
         viewer.cam.distance = 5.5
         for ep in range(args.max_episodes):
+            n = 0
             if not alive(viewer):
                 break
             brain = soft_reset(env, brain) if ep > 0 else brain
@@ -73,8 +76,9 @@ def main():
                 step_start = time.time()
                 obs = env.observe()
                 o = obs["odom"]
-                th, st = brain.step(obs["gray"], obs["ranges"],
-                                    o["goal_bearing_deg"], o["yaw_rate_deg"], dt, o)
+                th, st = brain.step(
+                    obs["frame"], obs["gray"], obs["ranges"], o["yaw_rate_deg"], dt
+                )
                 obs = env.step(th, st)
                 if args.follow:
                     x, y, _ = env.car_pose()

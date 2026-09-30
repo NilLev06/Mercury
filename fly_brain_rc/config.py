@@ -55,6 +55,11 @@ class DriveConfig:
     wheel_friction: float = 0.6
     track: float = 0.36
     wheel_radius: float = 0.035
+    wheelbase: float = 0.18
+    linear_accel: float = 0.8
+    linear_decel: float = 1.6
+    angular_accel: float = 4.0
+    collision_radius: float = 0.30
     timestep: float = 0.02
 
 
@@ -67,7 +72,7 @@ class SimConfig:
     goal_radius: float = 0.25
     cam_width: int = 128
     cam_height: int = 96
-    episode_steps: int = 1200
+    episode_steps: int = 2400
     kinematic: bool = True
 
 

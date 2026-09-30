@@ -6,8 +6,8 @@ Use --physical for the honest low-level contact physics (the floor
 contact model pins yaw, so in that mode the car only goes straight).
 
 Usage:
-    python scripts/drive_manual.py scenes/scene_seed0.xml
-    python scripts/drive_manual.py scenes/scene_seed5.xml --physical
+    mjpython -m scripts.drive_manual scenes/scene_seed0.xml
+    mjpython -m scripts.drive_manual scenes/scene_seed5.xml --physical
 
 Controls:
     W / Up        throttle forward
@@ -26,6 +26,7 @@ import mujoco
 import mujoco.viewer
 
 from fly_brain_rc.config import DRIVE
+from fly_brain_rc.sim.kinematics import yaw_quaternion
 
 GLFW_UP = 265
 GLFW_DOWN = 264
@@ -74,26 +75,30 @@ def main():
                 obstacles.append(tuple(model.geom_pos[b][:2]))
 
     def kinematic_step(throttle, steer, dt):
-        w_cmd = steer * drive.max_omega
         st = state
-        st["w_cmd"] += dt * max(-dt * 16.0, min(16.0 * dt, w_cmd - st["w_cmd"]))
         v_cmd = throttle * drive.max_speed
-        st["speed"] += dt * max(-8.0 * dt, min(8.0 * dt, v_cmd - st["speed"]))
+        rate = drive.linear_accel if abs(v_cmd) > abs(st["speed"]) else drive.linear_decel
+        st["speed"] += max(-rate * dt, min(rate * dt, v_cmd - st["speed"]))
+        delta = steer * drive.max_steer_rad
+        st["w_cmd"] = st["speed"] * math.tan(delta) / drive.wheelbase
         st["heading"] += st["w_cmd"] * dt
         nx = data.qpos[0] + st["speed"] * math.cos(st["heading"]) * dt
         ny = data.qpos[1] + st["speed"] * math.sin(st["heading"]) * dt
-        if any(math.hypot(nx - ox, ny - oy) < 0.33 for ox, oy in obstacles):
+        if any(
+            math.hypot(nx - ox, ny - oy) < drive.collision_radius + 0.28
+            for ox, oy in obstacles
+        ):
+            st["speed"] = 0.0
             return  # blocked by obstacle, do not move
         data.qpos[0] = nx
         data.qpos[1] = ny
         data.qpos[2] = 0.05
         h = st["heading"]
-        data.qpos[3], data.qpos[4], data.qpos[5], data.qpos[6] = (
-            math.cos(h / 2), 0.0, math.sin(h / 2), math.cos(h / 2))
+        data.qpos[3:7] = yaw_quaternion(h)
         jq_steer = model.jnt_qposadr[model.joint("steer_joint").id]
         data.qpos[jq_steer] = steer * drive.max_steer_rad
         spin = st["speed"] / drive.wheel_radius
-        for name in ("wheel_fl", "wheel_fr"):
+        for name in ("wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"):
             j = model.jnt_qposadr[model.joint(name).id]
             data.qpos[j] += spin * dt
         mujoco.mj_forward(model, data)
@@ -112,8 +117,8 @@ def main():
             if steering:
                 kinematic_step(float(th), float(st), dt)
             else:
-                data.ctrl[model.actuator("motor_fl").id] = 0.55 * th
-                data.ctrl[model.actuator("motor_fr").id] = 0.55 * th
+                data.ctrl[model.actuator("motor_rl").id] = 0.55 * th
+                data.ctrl[model.actuator("motor_rr").id] = 0.55 * th
                 data.ctrl[model.actuator("steer").id] = 0.25 * st
                 mujoco.mj_step(model, data)
             viewer.sync()

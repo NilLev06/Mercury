@@ -6,6 +6,7 @@ import mujoco
 
 from ..config import SimConfig, DriveConfig
 from .car_model import build_model_xml
+from .kinematics import BicycleState, step_bicycle, yaw_quaternion
 
 
 class FlyCarEnv:
@@ -15,9 +16,9 @@ class FlyCarEnv:
         self._rng = random.Random(seed)
         self.obstacles = []
         self.goal = (2.0, 0.0)
-        self._build_episode()
-        self.renderer = mujoco.Renderer(self.m, sim_cfg.cam_width, sim_cfg.cam_height)
+        self.renderer = None
         self.collisions = 0
+        self.penetrations = 0
         self.sim_steps = 0
         self.start_pose = None
         self.reset()
@@ -35,7 +36,16 @@ class FlyCarEnv:
                     continue
                 if all(math.hypot(x - ox, y - oy) > 1.0 for (ox, oy), _ in obstacles):
                     break
-            obstacles.append(((x, y), (self._rng.uniform(0.3, 1.0), self._rng.uniform(0.3, 1.0), self._rng.uniform(0.3, 1.0))))
+            obstacles.append(
+                (
+                    (x, y),
+                    (
+                        self._rng.uniform(0.20, 0.45),
+                        self._rng.uniform(0.45, 0.75),
+                        self._rng.uniform(0.65, 0.95),
+                    ),
+                )
+            )
         gx, gy = None, None
         for attempt in range(200):
             gx = self._rng.uniform(-o + 1.2, o - 1.2)
@@ -51,38 +61,44 @@ class FlyCarEnv:
     def reset(self):
         self._build_episode()
         self._indices()
-        self.start_pose = self.car_pose()
+        self.start_pose = (0.0, 0.0, 0.0)
         self.collisions = 0
+        self.penetrations = 0
         self.sim_steps = 0
         self.speed = 0.0
         self.heading = float(self.start_pose[2])
+        self.state = BicycleState(self.start_pose[0], self.start_pose[1], self.heading, 0.0)
         self._w_cmd = 0.0
         self._w_cmd_prev = 0.0
+        self._contact_active = False
         for i in range(self.m.nq):
             self.d.qpos[i] = 0.0
         self.d.qpos[2] = 0.05
         self.d.qpos[3] = 1.0
         x, y = self.start_pose[0], self.start_pose[1]
         self.d.qpos[0], self.d.qpos[1] = x, y
-        self.d.qpos[3], self.d.qpos[4], self.d.qpos[5], self.d.qpos[6] = (
-            math.cos(self.heading / 2), 0.0, math.sin(self.heading / 2), math.cos(self.heading / 2))
         self._sync_kinematic()
+        if self.renderer is not None:
+            self.renderer.close()
+        self.renderer = mujoco.Renderer(self.m, self.sim_cfg.cam_width, self.sim_cfg.cam_height)
         return self.observe()
 
     def _indices(self):
         m = self.m
         take = lambda x: int(np.asarray(x).reshape(-1)[0])
-        self.i_motor_l = m.actuator("motor_fl").id
-        self.i_motor_r = m.actuator("motor_fr").id
+        self.i_motor_l = m.actuator("motor_rl").id
+        self.i_motor_r = m.actuator("motor_rr").id
         self.adr_b_fl = take(m.sensor("b_fl").adr)
         self.adr_b_fr = take(m.sensor("b_fr").adr)
         self.adr_b_fc = take(m.sensor("b_fc").adr)
         self.adr_gyro = take(m.sensor("gyro").adr)
-        self.adr_wl = m.jnt_dofadr[m.joint("wheel_fl").id]
-        self.adr_wr = m.jnt_dofadr[m.joint("wheel_fr").id]
+        self.adr_wl = m.jnt_dofadr[m.joint("wheel_rl").id]
+        self.adr_wr = m.jnt_dofadr[m.joint("wheel_rr").id]
         self.jq_steer = m.jnt_qposadr[m.joint("steer_joint").id]
-        self.jq_wl = m.jnt_qposadr[m.joint("wheel_fl").id]
-        self.jq_wr = m.jnt_qposadr[m.joint("wheel_fr").id]
+        self.jq_fl = m.jnt_qposadr[m.joint("wheel_fl").id]
+        self.jq_fr = m.jnt_qposadr[m.joint("wheel_fr").id]
+        self.jq_wl = m.jnt_qposadr[m.joint("wheel_rl").id]
+        self.jq_wr = m.jnt_qposadr[m.joint("wheel_rr").id]
         self._have_indices = True
 
     def observe(self):
@@ -99,6 +115,7 @@ class FlyCarEnv:
             "front_left": prox(front_l),
             "front_right": prox(front_r),
             "center": prox(front_c),
+            "contact": self._contact_active,
         }
         yaw = self._yaw()
         if self.sim_cfg.kinematic:
@@ -123,8 +140,8 @@ class FlyCarEnv:
         return dict(frame=frame, gray=gray, ranges=ranges, odom=odom)
 
     def _yaw(self):
-        x, _y, z, w = self.d.qpos[3], self.d.qpos[4], self.d.qpos[5], self.d.qpos[6]
-        return math.atan2(2.0 * (w * z + x * _y), 1.0 - 2.0 * (_y * _y + z * z))
+        w, x, y, z = self.d.qpos[3:7]
+        return math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
 
     def car_pose(self):
         x, y = float(self.d.qpos[0]), float(self.d.qpos[1])
@@ -139,38 +156,53 @@ class FlyCarEnv:
             self.step_physical(throttle, steer, ctrl_substeps)
         self.sim_steps += 1
         obs = self.observe()
-        if self.sim_cfg.kinematic:
-            if self._collision_2d():
-                self.collisions += 1
-        else:
-            if any(v < 0.06 for v in obs["ranges"].values()):
-                self.collisions += 1
+        if not self.sim_cfg.kinematic:
+            physical_contact = any(
+                obs["ranges"][name] < 0.06
+                for name in ("front_left", "front_right", "center")
+            )
+            self._record_contact(physical_contact)
         return obs
 
     def step_kinematic(self, throttle: float, steer: float, dt: float):
-        w_cmd = steer * self.drive.max_omega
-        self._w_cmd += dt * max(-dt * 16.0, min(16.0 * dt, w_cmd - self._w_cmd))
-        v_cmd = throttle * self.drive.max_speed
-        self.speed += dt * max(-8.0 * dt, min(8.0 * dt, v_cmd - self.speed))
-        self.heading += self._w_cmd * dt
-        self.d.qpos[0] += self.speed * math.cos(self.heading) * dt
-        self.d.qpos[1] += self.speed * math.sin(self.heading) * dt
-        self._w_cmd_prev = self._w_cmd
-        self._sync_kinematic(self.speed / self.drive.wheel_radius, steer)
+        before = self.state
+        candidate = step_bicycle(before, throttle, steer, self.drive, dt)
+        hit = self._pose_collides(candidate)
+        self._record_contact(hit)
+        if hit:
+            candidate = BicycleState(before.x, before.y, before.yaw, 0.0, 0.0)
+        self.state = candidate
+        self.speed = candidate.speed
+        self.heading = candidate.yaw
+        self._w_cmd_prev = candidate.yaw_rate
+        wheel_spin = candidate.speed / self.drive.wheel_radius
+        self._sync_kinematic(wheel_spin, steer)
+        if self._pose_collides(self.state):
+            self.penetrations += 1
 
-    def _collision_2d(self):
-        cfg = self.sim_cfg
-        thr = cfg.obstacle_radius + 0.07
+    def _pose_collides(self, state: BicycleState) -> bool:
+        limit = self.sim_cfg.arena_half - self.drive.collision_radius
+        if abs(state.x) > limit or abs(state.y) > limit:
+            return True
+        threshold = self.sim_cfg.obstacle_radius + self.drive.collision_radius
         for (ox, oy), _ in self.obstacles:
-            if math.hypot(self.d.qpos[0] - ox, self.d.qpos[1] - oy) < thr:
+            if math.hypot(state.x - ox, state.y - oy) < threshold:
                 return True
         return False
 
+    def _record_contact(self, colliding: bool):
+        if colliding and not self._contact_active:
+            self.collisions += 1
+        self._contact_active = colliding
+
     def _sync_kinematic(self, wheel_spin: float = 0.0, steer: float = 0.0):
+        self.d.qpos[0] = self.state.x
+        self.d.qpos[1] = self.state.y
         self.d.qpos[2] = 0.05
-        self.d.qpos[3], self.d.qpos[4], self.d.qpos[5], self.d.qpos[6] = (
-            math.cos(self.heading / 2), 0.0, math.sin(self.heading / 2), math.cos(self.heading / 2))
+        self.d.qpos[3:7] = yaw_quaternion(self.state.yaw)
         self.d.qpos[self.jq_steer] = steer * self.drive.max_steer_rad
+        self.d.qpos[self.jq_fl] += wheel_spin * self.drive.timestep
+        self.d.qpos[self.jq_fr] += wheel_spin * self.drive.timestep
         self.d.qpos[self.jq_wl] += wheel_spin * self.drive.timestep
         self.d.qpos[self.jq_wr] += wheel_spin * self.drive.timestep
         mujoco.mj_forward(self.m, self.d)

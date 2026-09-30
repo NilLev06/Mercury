@@ -1,5 +1,6 @@
 import argparse
 import time
+from collections import Counter
 
 import numpy as np
 import matplotlib
@@ -25,28 +26,38 @@ def build_brain():
     return brain
 
 
-def run_episode(brain: FlyBrainController, env: FlyCarEnv, steps: int, seed, debug_dir=None):
-    obs = env.reset()
+def run_episode(brain: FlyBrainController, env: FlyCarEnv, steps: int):
+    obs = env.observe()
     traj = []
     goals_hit = False
     throttle_log = []
     steer_log = []
+    visible_steps = 0
+    mode_steps = Counter()
+    min_goal_distance = float("inf")
     t = 0.0
     for i in range(steps):
-        gb = obs["odom"]["goal_bearing_deg"]
         yaw_rate = obs["odom"]["yaw_rate_deg"]
-        throttle, steer = brain.step(obs["gray"], obs["ranges"], gb, yaw_rate, DRIVE.timestep, obs["odom"])
+        throttle, steer = brain.step(
+            obs["frame"], obs["gray"], obs["ranges"], yaw_rate, DRIVE.timestep
+        )
         obs = env.step(throttle, steer)
+        visible_steps += int(brain.goal_observation.visible)
+        mode_steps[brain.mode] += 1
         x, y, yaw = env.car_pose()
         traj.append((x, y))
         throttle_log.append(throttle)
         steer_log.append(steer)
         t += DRIVE.timestep
+        min_goal_distance = min(min_goal_distance, obs["odom"]["dist_to_goal"])
         if obs["odom"]["dist_to_goal"] < SIM.goal_radius:
             goals_hit = True
             break
     return dict(traj=traj, success=goals_hit, steps=i + 1, time=t,
-                collisions=env.collisions, throttle=throttle_log, steer=steer_log)
+                collisions=env.collisions, penetrations=env.penetrations,
+                throttle=throttle_log, steer=steer_log,
+                visibility_ratio=visible_steps / max(i + 1, 1),
+                mode_steps=dict(mode_steps), min_goal_distance=min_goal_distance)
 
 
 def plot_episode(env, res, path):
@@ -81,11 +92,11 @@ def main():
     ap.add_argument("--out", default="figures/run.png")
     args = ap.parse_args()
     steps = args.steps or SIM.episode_steps
-    brain = build_brain()
-    env = FlyCarEnv(SIM, DRIVE, seed=args.seed)
     stats = []
     for ep in range(args.episodes):
-        res = run_episode(brain, env, steps, args.seed + ep)
+        env = FlyCarEnv(SIM, DRIVE, seed=args.seed + ep)
+        brain = build_brain()
+        res = run_episode(brain, env, steps)
         print(f"episode {ep}: success={res['success']} collisions={res['collisions']} "
               f"steps={res['steps']} time={res['time']:.1f}s")
         plot_episode(env, res, f"figures/ep{ep}_{args.out if False else args.out.split('/')[-1]}")

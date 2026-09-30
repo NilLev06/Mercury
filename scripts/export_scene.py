@@ -20,7 +20,14 @@ def _draw_once(rng):
             if all(math_hypot(x - ox, y - oy) > 1.0 for (ox, oy), _ in obstacles):
                 break
         obstacles.append(
-            ((x, y), (rng.uniform(0.3, 1.0), rng.uniform(0.3, 1.0), rng.uniform(0.3, 1.0)))
+            (
+                (x, y),
+                (
+                    rng.uniform(0.20, 0.45),
+                    rng.uniform(0.45, 0.75),
+                    rng.uniform(0.65, 0.95),
+                ),
+            )
         )
     gx, gy = None, None
     for attempt in range(200):
