@@ -41,7 +41,7 @@ class MissionController:
 
     def finish(self, result, *, generation=None):
         with self.lock:
-            if generation is not None and generation != self.generation:
+            if self.status != 'running' or (generation is not None and generation != self.generation):
                 return
             self.status = 'finished'
             self.result = result

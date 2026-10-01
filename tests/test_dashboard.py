@@ -38,6 +38,14 @@ class DashboardTests(unittest.TestCase):
         self.mission.finish({'stable_arrival': False}, generation=generation)
         self.assertEqual(self.mission.state()['status'], 'running')
 
+    def test_episode_completion_cannot_overwrite_stopped_mission(self):
+        self.mission.start('red_ball')
+        generation = self.mission.state()['generation']
+        self.mission.stop()
+        self.mission.finish({'stable_arrival': False}, generation=generation)
+        self.assertEqual(self.mission.state()['status'], 'stopped')
+        self.assertIsNone(self.mission.state()['result'])
+
     def test_sse_latest_record(self):
         self.bus.publish({'sequence': 42})
         conn = http.client.HTTPConnection(*self.server.address, timeout=2)

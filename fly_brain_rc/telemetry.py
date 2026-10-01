@@ -10,6 +10,9 @@ import numpy as np
 class TelemetryBus:
     def __init__(self):
         self._lock = Lock()
+        # Encoding is independent of runtime fanout. Slow browser JPEG work
+        # must never hold the lock needed by publish/subscribe/unsubscribe.
+        self._preview_lock = Lock()
         self._subscribers = set()
         self.latest = None
         self._preview = None
@@ -61,7 +64,7 @@ class TelemetryBus:
             return value
         result = encode(record)
         if hasattr(record, 'sensor'):
-            with self._lock:
+            with self._preview_lock:
                 now = time.monotonic()
                 if now - self._preview_time >= .1:
                     import cv2
