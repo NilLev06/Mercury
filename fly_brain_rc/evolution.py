@@ -75,6 +75,7 @@ class EvolutionState:
     def to_dict(self):
         return {'version': 1, 'topology_version': TOPOLOGY_VERSION,
                 'parameter_version': FlyGenome.VERSION,
+                'parameter_order': list(FlyGenome.BOUNDS),
                 'parameter_schema': {k: list(v) for k, v in FlyGenome.BOUNDS.items()},
                 'seed': self.seed, 'generation': self.generation,
                 'population': [g.vector().tolist() for g in self.population],
@@ -103,6 +104,7 @@ class EvolutionState:
             data = json.loads(Path(path).read_text())
             if (data['version'] != 1 or data['topology_version'] != TOPOLOGY_VERSION
                     or data['parameter_version'] != FlyGenome.VERSION
+                    or data['parameter_order'] != list(FlyGenome.BOUNDS)
                     or data['parameter_schema'] != {k: list(v) for k, v in FlyGenome.BOUNDS.items()}):
                 raise ValueError('checkpoint topology or parameter schema mismatch')
             if (data['seed'] != config.seed or tuple(data['scenario_ids']) != config.scenario_ids

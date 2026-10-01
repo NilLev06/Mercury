@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import MappingProxyType
 from dataclasses import replace
 from fly_brain_rc.evolution import EvolutionConfig, GenomeScore, EvolutionState, evolve
 from fly_brain_rc.neural.genome import FlyGenome
@@ -61,3 +63,15 @@ class EvolutionTests(unittest.TestCase):
             evolve(config, evaluator)
             with self.assertRaises(ValueError):
                 evolve(replace(config, resume=path, steps=3), evaluator)
+
+    def test_resume_rejects_reordered_parameters_with_identical_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / 'state.json')
+            config = EvolutionConfig(checkpoint=path)
+            evolve(config, evaluator)
+            names = list(FlyGenome.BOUNDS)
+            names[1], names[2] = names[2], names[1]
+            reordered = MappingProxyType({name: FlyGenome.BOUNDS[name] for name in names})
+            with patch.object(FlyGenome, 'BOUNDS', reordered):
+                with self.assertRaises(ValueError):
+                    EvolutionState.load(path, config)
