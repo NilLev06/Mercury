@@ -142,13 +142,16 @@ class EnvironmentIntegrationTests(unittest.TestCase):
 
         self.assertAlmostEqual(frame.yaw_rate, 0.73)
 
-    def test_apply_returns_next_sensor_frame_with_encoder_displacement(self):
+    def test_apply_advances_without_render_and_next_read_retains_displacement(self):
         with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
             env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3,
                             scenario=Scenario("sensor_test", (), (2.0, 0.0)), render=True)
         try:
             initial = env.sensor_frame()
-            frame = env.apply(ActuatorCommand(traction=1.0, steering=0.0, timestamp=0.0, sequence=1))
+            with patch.object(env.renderer, 'render', wraps=env.renderer.render) as render:
+                self.assertIsNone(env.apply(ActuatorCommand(traction=1.0, steering=0.0, timestamp=0.0, sequence=1)))
+                render.assert_not_called()
+            frame = env.sensor_frame()
             self.assertIsInstance(frame, SensorFrame)
             self.assertGreater(frame.timestamp, initial.timestamp)
             self.assertGreater(frame.encoder_delta, 0.0)

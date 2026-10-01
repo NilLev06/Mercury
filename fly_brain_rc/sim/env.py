@@ -203,11 +203,10 @@ class FlyCarEnv:
             timestamp=self.sim_steps * self.drive.timestep,
         )
 
-    def apply(self, command: ActuatorCommand) -> SensorFrame:
-        self.step(command.traction, command.steering)
-        return self.sensor_frame()
+    def apply(self, command: ActuatorCommand) -> None:
+        self.step(command.traction, command.steering, observe=False)
 
-    def step(self, throttle: float, steer: float, ctrl_substeps: int = 1):
+    def step(self, throttle: float, steer: float, ctrl_substeps: int = 1, *, observe=True):
         dt = self.drive.timestep
         self._indices()
         if self.sim_cfg.kinematic:
@@ -215,14 +214,13 @@ class FlyCarEnv:
         else:
             self.step_physical(throttle, steer, ctrl_substeps)
         self.sim_steps += 1
-        obs = self.observe()
         if not self.sim_cfg.kinematic:
             physical_contact = any(
-                obs["ranges"][name] < 0.06
-                for name in ("front_left", "front_right", "center")
+                0 < float(self.d.sensordata[adr]) < 0.06
+                for adr in (self.adr_b_fl, self.adr_b_fr, self.adr_b_fc)
             )
             self._record_contact(physical_contact)
-        return obs
+        return self.observe() if observe else None
 
     def step_kinematic(self, throttle: float, steer: float, dt: float):
         before = self.state

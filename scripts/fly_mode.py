@@ -1,112 +1,67 @@
-"""Fly brain drives the car autonomously, shown live in the MuJoCo viewer.
-
-The brain (reflex + looming + goal/flow) navigates to the goal in
-kinematic mode; the viewer only visualizes. Esc closes the window.
-
-Usage:
-    mjpython -m scripts.fly_mode --seed 0
-    mjpython -m scripts.fly_mode --seed 5 --max_episodes 3
-"""
+"""Drive the neural runtime in the persistent passive MuJoCo viewer."""
 import argparse
 import sys
 import time
-
-import numpy as np
-import mujoco
-import mujoco.viewer  # noqa: F401
-
+import mujoco.viewer
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
-from fly_brain_rc.sim.kinematics import BicycleState
 from fly_brain_rc.sim.scenarios import get_scenario, scenario_names
-from scripts.run_sim import build_brain
+from fly_brain_rc.sim.kinematics import BicycleState
+from fly_brain_rc.neural.brain import NeuralFlyBrain
+from fly_brain_rc.runtime import FlyRuntime, load_genome, run_episode
 
 
-def soft_reset(env, brain):
-    brain = build_brain()
-    d = env.d
-    env.sim_steps = 0
-    env.collisions = 0
-    env.speed = 0.0
-    env.heading = 0.0
-    env._w_cmd = 0.0
-    env._w_cmd_prev = 0.0
-    env._contact_active = False
-    for i in range(env.m.nq):
-        d.qpos[i] = 0.0
-    d.qpos[2] = 0.05
-    d.qpos[3] = 1.0
-    env.state = BicycleState()
-    env._sync_kinematic()
-    return brain
-
-
-def alive(v):
-    r = v.is_running
-    return r() if callable(r) else bool(r)
+def alive(viewer):
+    return viewer.is_running() if callable(viewer.is_running) else bool(viewer.is_running)
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--max_episodes", type=int, default=4)
-    ap.add_argument("--scenario", choices=scenario_names(), default=None)
-    ap.add_argument("--close-on-finish", action="store_true")
-    ap.add_argument("--follow", action="store_true", default=True,
-                    help="camera follows the car (top-down view)")
-    args = ap.parse_args()
-
-    scenario = get_scenario(args.scenario) if args.scenario else None
-    env = FlyCarEnv(SIM, DRIVE, seed=args.seed, scenario=scenario)
-    brain = build_brain()
-    dt = DRIVE.timestep
-
-    print(f"fly mode: seed={args.seed}  max_episodes={args.max_episodes}")
-    print("control: W/S throttle-A/D steer-NONE (autonomous brain). Esc quits.")
-
-    with mujoco.viewer.launch_passive(env.m, env.d) as viewer:
-        viewer.cam.azimuth = -30
-        viewer.cam.elevation = -55
-        viewer.cam.distance = 5.5
-        for ep in range(args.max_episodes):
-            n = 0
-            if not alive(viewer):
-                break
-            brain = soft_reset(env, brain) if ep > 0 else brain
-            succ = False
-            for i in range(SIM.episode_steps):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--max_episodes', type=int, default=1)
+    parser.add_argument('--scenario', choices=scenario_names())
+    parser.add_argument('--close-on-finish', action='store_true')
+    parser.add_argument('--follow', action='store_true', default=True)
+    parser.add_argument('--genome')
+    parser.add_argument('--target', choices=('red_ball',), default='red_ball')
+    args = parser.parse_args()
+    genome = load_genome(args.genome)
+    env = FlyCarEnv(SIM, DRIVE, seed=args.seed,
+                    scenario=get_scenario(args.scenario) if args.scenario else None)
+    try:
+        with mujoco.viewer.launch_passive(env.m, env.d) as viewer:
+            viewer.cam.azimuth, viewer.cam.elevation, viewer.cam.distance = -30, -55, 5.5
+            for episode in range(args.max_episodes):
                 if not alive(viewer):
                     break
-                step_start = time.time()
-                obs = env.observe()
-                o = obs["odom"]
-                th, st = brain.step(
-                    obs["frame"], obs["gray"], obs["ranges"], o["yaw_rate_deg"], dt
-                )
-                obs = env.step(th, st)
-                if args.follow:
-                    x, y, _ = env.car_pose()
-                    viewer.cam.lookat[:2] = [x, y]
-                viewer.sync()
-                elapsed = time.time() - step_start
-                if obs["odom"]["dist_to_goal"] < SIM.goal_radius:
-                    succ, n = True, i + 1
-                    break
-                time.sleep(max(0.0, dt - elapsed))
-            else:
-                n = SIM.episode_steps
-            print(f"episode {ep}: success={succ} steps={n} collisions={env.collisions} "
-                  f"time={n * dt:.1f}s")
-            if not alive(viewer):
-                break
-        if alive(viewer) and not args.close_on_finish:
-            print("run complete; viewer stays open until Esc")
-            while alive(viewer):
-                viewer.sync()
-                time.sleep(0.05)
+                if episode:
+                    env.collisions = env.penetrations = env.sim_steps = 0
+                    env.speed = env.heading = env._w_cmd = env._w_cmd_prev = 0.0
+                    env._contact_active = False
+                    env.state = BicycleState()
+                    env.d.qpos[:] = 0
+                    env._sync_kinematic()
+                    env._last_encoder_position = env._encoder_position()
+                runtime = FlyRuntime(env, NeuralFlyBrain(genome), target=args.target)
+                def display(record):
+                    if not alive(viewer):
+                        raise KeyboardInterrupt
+                    if args.follow:
+                        viewer.cam.lookat[:2] = env.car_pose()[:2]
+                    viewer.sync()
+                    time.sleep(DRIVE.timestep)
+                result = run_episode(runtime, SIM.episode_steps, on_tick=display)
+                print(f'episode {episode}: {result}')
+            if alive(viewer) and not args.close_on_finish:
+                print('run complete; viewer stays open until Esc')
+                while alive(viewer):
+                    viewer.sync()
+                    time.sleep(.05)
+    finally:
+        env.renderer.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:

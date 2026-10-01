@@ -1,68 +1,62 @@
-"""Repeatable headless evaluation for visual goal-seeking behavior."""
-
+"""Structured neural evaluation."""
 import argparse
-
+from dataclasses import asdict
+import json
 from fly_brain_rc.config import DRIVE, SIM
 from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.sim.scenarios import get_scenario, scenario_names
-from scripts.run_sim import build_brain, run_episode
+from fly_brain_rc.sim.suites import training_cases, type_a_cases, type_b_cases
+from fly_brain_rc.neural.brain import NeuralFlyBrain
+from fly_brain_rc.runtime import FlyRuntime, load_genome, run_episode
 
 
-def episode_seeds(count: int, start: int = 0) -> list[int]:
+def episode_seeds(count, start=0):
     return list(range(start, start + count))
 
 
-def acceptance_passes(
-    successes: int, episodes: int, penetrations: int, required_rate: float
-) -> bool:
+def acceptance_passes(successes, episodes, penetrations, required_rate):
     return episodes > 0 and successes / episodes >= required_rate and penetrations == 0
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--episodes", type=int, default=20)
-    parser.add_argument("--start-seed", type=int, default=0)
-    parser.add_argument("--steps", type=int, default=SIM.episode_steps)
-    parser.add_argument("--required-rate", type=float, default=None)
-    parser.add_argument("--suite", choices=("random", "scenarios"), default="random")
-    parser.add_argument("--scenario", choices=scenario_names())
+    parser.add_argument('--episodes', type=int, default=10)
+    parser.add_argument('--start-seed', type=int, default=0)
+    parser.add_argument('--steps', type=int, default=SIM.episode_steps)
+    parser.add_argument('--required-rate', type=float, default=.75)
+    parser.add_argument('--suite', choices=('train', 'type-a', 'type-b', 'random', 'scenarios'), default='type-a')
+    parser.add_argument('--scenario', choices=scenario_names())
+    parser.add_argument('--genome')
+    parser.add_argument('--target', choices=('red_ball',), default='red_ball')
     args = parser.parse_args()
-    required_rate = args.required_rate
-    if required_rate is None:
-        required_rate = 0.75
-
-    successes = 0
-    contacts = 0
-    penetrations = 0
+    if args.episodes <= 0 or args.steps <= 0:
+        parser.error('episodes and steps must be positive')
+    genome = load_genome(args.genome)
     if args.scenario:
-        cases = [(args.scenario, 0)]
-    elif args.suite == "scenarios":
-        cases = [(name, 0) for name in scenario_names()]
+        cases = [(args.scenario, 0, get_scenario(args.scenario))]
+    elif args.suite == 'scenarios':
+        cases = [(name, 0, get_scenario(name)) for name in scenario_names()]
     else:
-        cases = [(None, seed) for seed in episode_seeds(args.episodes, args.start_seed)]
-
-    for scenario_name, seed in cases:
-        scenario = get_scenario(scenario_name) if scenario_name else None
+        suite = (training_cases(args.start_seed, args.episodes) if args.suite in ('train', 'random')
+                 else type_a_cases() if args.suite == 'type-a' else type_b_cases())
+        if args.episodes > len(suite):
+            parser.error('held-out suites contain 10 unique cases; request at most 10 episodes')
+        cases = [(c.identifier, c.seed, c.scenario) for c in suite[:args.episodes]]
+    successes = contacts = penetrations = 0
+    for identifier, seed, scenario in cases:
         env = FlyCarEnv(SIM, DRIVE, seed=seed, scenario=scenario)
-        result = run_episode(build_brain(), env, args.steps)
-        successes += int(result["success"])
-        contacts += result["collisions"]
-        penetrations += result["penetrations"]
-        print(
-            f"case={scenario_name or f'seed-{seed:02d}'} success={result['success']} steps={result['steps']} "
-            f"contacts={result['collisions']} visible={result['visibility_ratio']:.2f} "
-            f"min_goal={result['min_goal_distance']:.3f} penetrations={result['penetrations']} "
-            f"reverse={result['reverse_steps']} near_goal_reverse={result['near_goal_reverse_steps']}"
-        )
-
-    total = len(cases)
-    rate = successes / max(total, 1)
-    print(
-        f"summary: successes={successes}/{total} rate={rate:.1%} "
-        f"contacts={contacts} penetrations={penetrations}"
-    )
-    return 0 if acceptance_passes(successes, total, penetrations, required_rate) else 1
+        try:
+            result = run_episode(FlyRuntime(env, NeuralFlyBrain(genome), target=args.target), args.steps)
+        finally:
+            env.renderer.close()
+        successes += int(result.success)
+        contacts += result.collisions
+        penetrations += result.penetrations
+        print(json.dumps({'case': identifier, **asdict(result)}, allow_nan=False), flush=True)
+    print(json.dumps({'suite': args.suite, 'successes': successes, 'episodes': len(cases),
+                      'rate': successes / len(cases), 'collisions': contacts, 'penetrations': penetrations}), flush=True)
+    return 0 if acceptance_passes(successes, len(cases), penetrations, args.required_rate) else 1
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

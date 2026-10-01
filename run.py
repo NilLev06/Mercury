@@ -27,11 +27,17 @@ def _run_simulator(args: argparse.Namespace) -> int:
         if args.scenario:
             command += ["--scenario", args.scenario]
         command += ["--seed", str(args.seed), "--episodes", str(args.episodes)]
+        command += ["--target", args.target]
+        if args.genome:
+            command += ["--genome", args.genome]
         os.execv(command[0], command)
 
     from scripts.fly_mode import main as fly_main
 
     sys.argv = ["scripts.fly_mode", "--seed", str(args.seed), "--max_episodes", str(args.episodes)]
+    sys.argv += ["--target", args.target]
+    if args.genome:
+        sys.argv += ["--genome", args.genome]
     if args.scenario:
         sys.argv += ["--scenario", args.scenario]
     fly_main()
@@ -48,11 +54,18 @@ def main() -> int:
     sim.add_argument("--episodes", type=int, default=1)
 
     evaluate = subparsers.add_parser("evaluate", help="run repeatable navigation benchmarks")
-    evaluate.add_argument("--suite", choices=("random", "scenarios"), default="scenarios")
+    evaluate.add_argument("--suite", choices=("train", "type-a", "type-b", "random", "scenarios"), default="type-a")
     evaluate.add_argument("--scenario", choices=("blocked_goal", "corridor", "slalom", "turn_corridor"))
     evaluate.add_argument("--episodes", type=int, default=20,
                           help="number of generated maps for --suite random (fixed scenarios run once each)")
 
+    from fly_brain_rc.config import SIM
+    evaluate.add_argument('--steps', type=int, default=SIM.episode_steps)
+    evaluate.add_argument('--start-seed', type=int, default=0)
+    evaluate.add_argument('--required-rate', type=float, default=.75)
+    for command_parser in (sim, evaluate):
+        command_parser.add_argument('--genome')
+        command_parser.add_argument('--target', choices=('red_ball',), default='red_ball')
     subparsers.add_parser("test", help="run the automated test suite")
     args = parser.parse_args()
 
@@ -68,7 +81,11 @@ def main() -> int:
         command = [
             sys.executable, "-m", "scripts.evaluate", "--suite", args.suite,
             "--episodes", str(args.episodes),
+            '--steps', str(args.steps), '--start-seed', str(args.start_seed),
+            '--required-rate', str(args.required_rate), '--target', args.target,
         ]
+        if args.genome:
+            command += ['--genome', args.genome]
         if args.scenario:
             command += ["--scenario", args.scenario]
         return subprocess.call(command)
