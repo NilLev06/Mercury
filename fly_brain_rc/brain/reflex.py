@@ -17,13 +17,13 @@ class BristleReflex:
         fr = min(ranges.get("front_right", 9.0), 9.0)
         if front < cfg.front_threshold:
             self.retreat_left = cfg.retreat_duration
-            self._evade_dir = -1.0 if fr < fl else 1.0
+            self._evade_dir = 1.0 if fr < fl else -1.0
         elif fl < cfg.side_threshold and fl < fr:
             self.evade_left = cfg.evade_duration
-            self._evade_dir = 1.0
+            self._evade_dir = -1.0
         elif fr < cfg.side_threshold:
             self.evade_left = cfg.evade_duration
-            self._evade_dir = -1.0
+            self._evade_dir = 1.0
         active = self.retreat_left > 0 or self.evade_left > 0
         steer = 0.0
         if self.retreat_left > 0:

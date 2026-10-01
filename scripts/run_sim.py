@@ -35,12 +35,21 @@ def run_episode(brain: FlyBrainController, env: FlyCarEnv, steps: int):
     visible_steps = 0
     mode_steps = Counter()
     min_goal_distance = float("inf")
+    reverse_steps = 0
+    near_goal_reverse_steps = 0
+    first_detection_step = None
     t = 0.0
     for i in range(steps):
         yaw_rate = obs["odom"]["yaw_rate_deg"]
         throttle, steer = brain.step(
             obs["frame"], obs["gray"], obs["ranges"], yaw_rate, DRIVE.timestep
         )
+        if brain.goal_observation.visible and first_detection_step is None:
+            first_detection_step = i
+        if throttle < 0.0:
+            reverse_steps += 1
+            if obs["odom"]["dist_to_goal"] < 0.8:
+                near_goal_reverse_steps += 1
         obs = env.step(throttle, steer)
         visible_steps += int(brain.goal_observation.visible)
         mode_steps[brain.mode] += 1
@@ -57,7 +66,10 @@ def run_episode(brain: FlyBrainController, env: FlyCarEnv, steps: int):
                 collisions=env.collisions, penetrations=env.penetrations,
                 throttle=throttle_log, steer=steer_log,
                 visibility_ratio=visible_steps / max(i + 1, 1),
-                mode_steps=dict(mode_steps), min_goal_distance=min_goal_distance)
+                mode_steps=dict(mode_steps), min_goal_distance=min_goal_distance,
+                reverse_steps=reverse_steps,
+                near_goal_reverse_steps=near_goal_reverse_steps,
+                first_detection_step=first_detection_step)
 
 
 def plot_episode(env, res, path):

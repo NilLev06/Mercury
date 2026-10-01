@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 MUJOCO_LOG.TXT
 .env
+.DS_Store
 figures/*diagnostic*.png
 figures/*bicycle_*.png

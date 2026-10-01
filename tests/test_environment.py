@@ -27,6 +27,13 @@ class EnvironmentGeometryTests(unittest.TestCase):
         self.assertTrue(env._pose_collides(BicycleState(x=2.9, y=0.0)))
         self.assertFalse(env._pose_collides(BicycleState(x=2.7, y=0.0)))
 
+    def test_swept_motion_cannot_tunnel_through_obstacle(self):
+        env = self.make_env()
+        before = BicycleState(x=0.0, y=0.0)
+        after = BicycleState(x=2.0, y=0.0)
+        self.assertFalse(env._pose_collides(after))
+        self.assertTrue(env._motion_collides(before, after))
+
     def test_contact_count_only_changes_on_contact_edge(self):
         env = self.make_env()
         env.collisions = 0
@@ -55,10 +62,11 @@ class EnvironmentGeometryTests(unittest.TestCase):
 
 class EnvironmentIntegrationTests(unittest.TestCase):
     def setUp(self):
-        self.env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3)
+        self.env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3, render=False)
 
     def tearDown(self):
-        self.env.renderer.close()
+        if self.env.renderer is not None:
+            self.env.renderer.close()
 
     def test_synced_pose_uses_z_axis_quaternion_and_reads_back_yaw(self):
         self.env.state = BicycleState(yaw=math.pi / 2)

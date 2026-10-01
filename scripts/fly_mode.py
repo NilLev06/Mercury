@@ -18,6 +18,7 @@ import mujoco.viewer  # noqa: F401
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.sim.kinematics import BicycleState
+from fly_brain_rc.sim.scenarios import get_scenario, scenario_names
 from scripts.run_sim import build_brain
 
 
@@ -49,11 +50,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max_episodes", type=int, default=4)
+    ap.add_argument("--scenario", choices=scenario_names(), default=None)
+    ap.add_argument("--close-on-finish", action="store_true")
     ap.add_argument("--follow", action="store_true", default=True,
                     help="camera follows the car (top-down view)")
     args = ap.parse_args()
 
-    env = FlyCarEnv(SIM, DRIVE, seed=args.seed)
+    scenario = get_scenario(args.scenario) if args.scenario else None
+    env = FlyCarEnv(SIM, DRIVE, seed=args.seed, scenario=scenario)
     brain = build_brain()
     dt = DRIVE.timestep
 
@@ -95,6 +99,11 @@ def main():
                   f"time={n * dt:.1f}s")
             if not alive(viewer):
                 break
+        if alive(viewer) and not args.close_on_finish:
+            print("run complete; viewer stays open until Esc")
+            while alive(viewer):
+                viewer.sync()
+                time.sleep(0.05)
 
 
 if __name__ == "__main__":

@@ -69,7 +69,8 @@ class SimConfig:
     n_obstacles: int = 8
     obstacle_radius: float = 0.28
     obstacle_height: float = 0.5
-    goal_radius: float = 0.25
+    # Rear-axle state reaches the 0.22 m target when the car nose is about 0.5 m away.
+    goal_radius: float = 0.50
     cam_width: int = 128
     cam_height: int = 96
     episode_steps: int = 2400

@@ -35,6 +35,7 @@ class FlyBrainController:
         self._avoid_direction = 1.0
         self._target_memory = 0.0
         self._last_target_bearing = 0.0
+        self._arrival_time = 0.0
 
     def _search_command(self, dt: float) -> tuple[float, float]:
         self._search_time += dt
@@ -60,6 +61,10 @@ class FlyBrainController:
         reflex = self.reflex.step(ranges, dt)
         goal = self.goal_detector.step(frame_rgb)
         self.goal_observation = goal
+        self._arrival_time = max(0.0, self._arrival_time - dt)
+        close_goal_in_view = goal.visible and goal.area > 0.10 and abs(goal.bearing) < 0.55
+        if close_goal_in_view:
+            self._arrival_time = 3.0
 
         if ranges.get("contact", False):
             self.mode = "avoid"
@@ -71,13 +76,13 @@ class FlyBrainController:
                 self._avoid_direction = 1.0
             else:
                 self._avoid_direction *= -1.0
-            self._avoid_time = 2.8
+            self._avoid_time = 4.0
             return -0.70, 0.95 * self._avoid_direction
 
         if self._avoid_time > 0.0:
             self.mode = "avoid"
             self._avoid_time = max(0.0, self._avoid_time - dt)
-            if self._avoid_time > 1.4:
+            if self._avoid_time > 2.4:
                 return -0.62, 0.9 * self._avoid_direction
             return 0.48, 0.95 * self._avoid_direction
 
@@ -89,26 +94,48 @@ class FlyBrainController:
         if validated_looming:
             self.mode = "avoid"
             self._avoid_direction = -1.0 if looming["side"] > 0.0 else 1.0
-            self._avoid_time = 2.0
+            self._avoid_time = 3.0
             return -0.45, self._avoid_direction
 
         front_left = ranges.get("front_left", 1000.0)
         front_right = ranges.get("front_right", 1000.0)
         front = min(front_left, ranges.get("center", 1000.0), front_right)
-        target_is_close_ahead = goal.visible and goal.area > 0.05 and abs(goal.bearing) < 0.55
+        goal_is_centered = (
+            (goal.visible and abs(goal.bearing) < 0.55)
+            or (self._target_memory > 0.0 and abs(self._last_target_bearing) < 0.55)
+        )
+        center_range = ranges.get("center", 1000.0)
+        side_range = min(front_left, front_right)
+        goal_range_signature = side_range < 0.25 and center_range > side_range + 0.25
+        isolated_center_obstacle = (
+            center_range < 0.06
+            and min(front_left, front_right) > center_range + 0.15
+        )
+        goal_envelops_sensors = (
+            self._arrival_time > 0.0
+            and goal.visible
+            and abs(goal.bearing) < 0.55
+            and max(front_left, center_range, front_right) < 0.08
+        )
+        target_is_close_ahead = goal_is_centered and (
+            goal_range_signature
+            or (close_goal_in_view and not isolated_center_obstacle)
+            or goal_envelops_sensors
+            or (self._arrival_time > 0.0 and center_range > 0.06)
+        )
         scanning_from_safe_start = not goal.visible and self._target_memory <= 0.0 and self._search_time < 11.0
         avoid_threshold = 0.12 if scanning_from_safe_start else 0.38
         reflex_trigger = reflex["active"] and not scanning_from_safe_start
         if (front < avoid_threshold or reflex_trigger) and not target_is_close_ahead:
             self.mode = "avoid"
             self._avoid_direction = reflex["steer"] or (-1.0 if front_left < front_right else 1.0)
-            self._avoid_time = 2.2
+            self._avoid_time = 3.0
             return -0.62, 0.9 * self._avoid_direction
 
         if goal.visible:
             self.mode = "approach"
             self._last_target_bearing = goal.bearing
-            self._target_memory = 0.55
+            self._target_memory = 2.0
             steer = float(np.clip(1.8 * goal.bearing + 0.12 * self.h1.steer(flow), -1.0, 1.0))
             throttle = 0.62 * (1.0 - 0.55 * abs(steer))
             if goal.area > 0.08:

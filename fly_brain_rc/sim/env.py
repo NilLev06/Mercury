@@ -7,13 +7,23 @@ import mujoco
 from ..config import SimConfig, DriveConfig
 from .car_model import build_model_xml
 from .kinematics import BicycleState, step_bicycle, yaw_quaternion
+from .scenarios import Scenario
 
 
 class FlyCarEnv:
-    def __init__(self, sim_cfg: SimConfig, drive: DriveConfig, seed: int = 0):
+    def __init__(
+        self,
+        sim_cfg: SimConfig,
+        drive: DriveConfig,
+        seed: int = 0,
+        scenario: Scenario | None = None,
+        render: bool = True,
+    ):
         self.sim_cfg = sim_cfg
         self.drive = drive
         self._rng = random.Random(seed)
+        self.scenario = scenario
+        self.render_enabled = render
         self.obstacles = []
         self.goal = (2.0, 0.0)
         self.renderer = None
@@ -25,6 +35,13 @@ class FlyCarEnv:
 
     def _build_episode(self):
         cfg = self.sim_cfg
+        if self.scenario is not None:
+            self.obstacles = list(self.scenario.obstacles)
+            self.goal = self.scenario.goal
+            xml = build_model_xml(cfg, self.drive, self.obstacles, self.goal)
+            self.m = mujoco.MjModel.from_xml_string(xml)
+            self.d = mujoco.MjData(self.m)
+            return
         o = cfg.arena_half
         start = (0.0, 0.0)
         obstacles = []
@@ -80,8 +97,11 @@ class FlyCarEnv:
         self._sync_kinematic()
         if self.renderer is not None:
             self.renderer.close()
-        self.renderer = mujoco.Renderer(self.m, self.sim_cfg.cam_width, self.sim_cfg.cam_height)
-        return self.observe()
+        self.renderer = (
+            mujoco.Renderer(self.m, self.sim_cfg.cam_width, self.sim_cfg.cam_height)
+            if self.render_enabled else None
+        )
+        return self.observe() if self.renderer is not None else None
 
     def _indices(self):
         m = self.m
@@ -167,7 +187,7 @@ class FlyCarEnv:
     def step_kinematic(self, throttle: float, steer: float, dt: float):
         before = self.state
         candidate = step_bicycle(before, throttle, steer, self.drive, dt)
-        hit = self._pose_collides(candidate)
+        hit = self._motion_collides(before, candidate)
         self._record_contact(hit)
         if hit:
             candidate = BicycleState(before.x, before.y, before.yaw, 0.0, 0.0)
@@ -187,6 +207,20 @@ class FlyCarEnv:
         threshold = self.sim_cfg.obstacle_radius + self.drive.collision_radius
         for (ox, oy), _ in self.obstacles:
             if math.hypot(state.x - ox, state.y - oy) < threshold:
+                return True
+        return False
+
+    def _motion_collides(self, before: BicycleState, after: BicycleState) -> bool:
+        distance = math.hypot(after.x - before.x, after.y - before.y)
+        samples = max(1, math.ceil(distance / max(self.drive.collision_radius * 0.5, 1e-6)))
+        for index in range(1, samples + 1):
+            fraction = index / samples
+            state = BicycleState(
+                x=before.x + (after.x - before.x) * fraction,
+                y=before.y + (after.y - before.y) * fraction,
+                yaw=before.yaw + (after.yaw - before.yaw) * fraction,
+            )
+            if self._pose_collides(state):
                 return True
         return False
 
