@@ -188,7 +188,7 @@ class FlyCarEnv:
         tof = center_range if 0.0 < center_range < 1.2 else 1.2
         yaw_rate = (
             self._w_cmd_prev if self.sim_cfg.kinematic
-            else float(self.d.sensordata[self.adr_gyro])
+            else float(self.d.sensordata[self.adr_gyro + 2])
         )
         encoder_position = self._encoder_position()
         encoder_delta = encoder_position - self._last_encoder_position

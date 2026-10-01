@@ -131,6 +131,17 @@ class EnvironmentIntegrationTests(unittest.TestCase):
             if env.renderer is not None:
                 env.renderer.close()
 
+    def test_physical_sensor_frame_reads_z_axis_yaw_rate(self):
+        self.env.sim_cfg.kinematic = False
+        self.env.renderer = HeadlessRenderer(
+            self.env.m, self.env.sim_cfg.cam_width, self.env.sim_cfg.cam_height
+        )
+        self.env.d.sensordata[self.env.adr_gyro:self.env.adr_gyro + 3] = (0.11, -0.22, 0.73)
+
+        frame = self.env.sensor_frame()
+
+        self.assertAlmostEqual(frame.yaw_rate, 0.73)
+
     def test_apply_returns_next_sensor_frame_with_encoder_displacement(self):
         with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
             env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3,
