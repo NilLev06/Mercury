@@ -32,6 +32,9 @@ def _run_simulator(args: argparse.Namespace) -> int:
             command += ["--genome", args.genome]
         if args.dashboard:
             command += ['--dashboard']
+        command += ['--memory', args.memory]
+        if args.reset_memory:
+            command += ['--reset-memory']
         os.execv(command[0], command)
 
     from scripts.fly_mode import main as fly_main
@@ -44,6 +47,9 @@ def _run_simulator(args: argparse.Namespace) -> int:
         sys.argv += ["--scenario", args.scenario]
     if args.dashboard:
         sys.argv += ['--dashboard']
+    sys.argv += ['--memory', args.memory]
+    if args.reset_memory:
+        sys.argv += ['--reset-memory']
     fly_main()
     return 0
 
@@ -57,6 +63,8 @@ def main() -> int:
     sim.add_argument("--seed", type=int, default=0)
     sim.add_argument("--episodes", type=int, default=1)
     sim.add_argument('--dashboard', action='store_true')
+    sim.add_argument('--memory', default=str(PROJECT_ROOT / '.local' / 'familiarity.json'), metavar='PATH')
+    sim.add_argument('--reset-memory', action='store_true', help='back up stored familiarity and start fresh')
     dashboard = subparsers.add_parser('dashboard', help='open a running simulation dashboard')
     dashboard.add_argument('--attach', default='127.0.0.1:8765', metavar='HOST:PORT')
 

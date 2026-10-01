@@ -2,6 +2,7 @@
 import argparse
 import sys
 import time
+from pathlib import Path
 import mujoco.viewer
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
@@ -9,6 +10,7 @@ from fly_brain_rc.sim.scenarios import get_scenario, scenario_names
 from fly_brain_rc.sim.kinematics import BicycleState
 from fly_brain_rc.neural.brain import NeuralFlyBrain
 from fly_brain_rc.runtime import FlyRuntime, load_genome, run_episode
+from scripts.memory_store import open_memory, save_memory
 
 
 def alive(viewer):
@@ -25,11 +27,18 @@ def main():
     parser.add_argument('--genome')
     parser.add_argument('--target', choices=('red_ball',), default='red_ball')
     parser.add_argument('--dashboard', action='store_true')
+    parser.add_argument('--memory', default=str(Path(__file__).resolve().parents[1] / '.local' / 'familiarity.json'))
+    parser.add_argument('--reset-memory', action='store_true')
     args = parser.parse_args()
+    try:
+        memory = open_memory(args.memory, reset=args.reset_memory)
+    except ValueError as exc:
+        parser.error(str(exc))
     genome = load_genome(args.genome)
     env = FlyCarEnv(SIM, DRIVE, seed=args.seed,
                     scenario=get_scenario(args.scenario) if args.scenario else None)
     dashboard = None
+    clean_shutdown = False
     try:
         if args.dashboard:
             import webbrowser
@@ -52,6 +61,7 @@ def main():
                     env._sync_kinematic()
                     env._last_encoder_position = env._encoder_position()
                 runtime = FlyRuntime(env, NeuralFlyBrain(genome), target=args.target,
+                                     memory=memory,
                                      emit=bus.publish if dashboard else None,
                                      mission=mission if dashboard else None)
                 def display(record):
@@ -81,10 +91,16 @@ def main():
                 while alive(viewer):
                     viewer.sync()
                     time.sleep(.05)
+        clean_shutdown = True
+    except KeyboardInterrupt:
+        clean_shutdown = True
+        raise
     finally:
         if dashboard:
             dashboard.close()
         env.renderer.close()
+        if clean_shutdown:
+            save_memory(memory, args.memory)
 
 
 if __name__ == '__main__':

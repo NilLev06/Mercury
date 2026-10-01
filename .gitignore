@@ -4,5 +4,6 @@ MUJOCO_LOG.TXT
 .env
 .DS_Store
 .worktrees/
+.local/
 figures/*diagnostic*.png
 figures/*bicycle_*.png

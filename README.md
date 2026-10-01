@@ -1,46 +1,51 @@
 # Digital Fly Car
 
-Симуляция RC-машинки с bicycle-кинематикой и зрительным контроллером, вдохновлённым реакциями мухи. Машинка ищет красную цель камерой, сближается с ней и объезжает препятствия. Контроллер не получает координаты цели из MuJoCo.
+Симуляция RC-машинки с bicycle-кинематикой и рекуррентным нейронным контроллером, вдохновлённым зрительными реакциями мухи. Контроллер получает камеру, yaw-rate, encoder, ToF и контакт; координаты цели используются только для оценки результатов. Нейронные популяции обновляются с шагом 0.02 с (50 Гц симуляционного времени). Это rate-модель, а не спайковая модель и не обучение весов во время езды.
+
+Красный шар распознаёт HSV mock backend `MockRedBallDetector` за интерфейсом `ObjectObservation`. YOLO и распознавание произвольных предметов пока не подключены. Знакомые виды камеры сохраняются между интерактивными запусками; моторные веса, компас и кратковременное нейронное состояние не сохраняются.
 
 ## Запуск двойным кликом
 
-Открой Finder и дважды нажми [Digital Fly Car.command](</Users/leonard/Desktop/DigitalFlyCar/Digital Fly Car.command>). Запустится карта с прямым коридором. После достижения цели окно MuJoCo останется открытым до нажатия Esc.
+В Finder дважды нажми `Digital Fly Car.command` в текущей папке проекта. Скрипт запускает коридор, viewer MuJoCo и dashboard в браузере. Папка проекта определяется по расположению скрипта; Python берётся из `/opt/miniconda3/envs/flybrain/bin/python`. Это окружение должно существовать. После завершения миссии viewer остаётся открытым до Esc.
 
-При первом запуске macOS может заблокировать файл. Тогда нажми по нему правой кнопкой, выбери «Открыть» и подтверди запуск.
+Dashboard показывает камеру, сенсоры, нейронные активности и команды моторов. Управление позволяет начать, остановить и сбросить миссию. Остановка обнуляет команды моторам. Подключение к работающему серверу: `python run.py dashboard --attach 127.0.0.1:8765`.
 
-## Единая команда запуска
+## Команды
 
-```bash
-conda activate flybrain
-cd /Users/leonard/Desktop/DigitalFlyCar
-python run.py sim --scenario corridor
-```
-
-`run.py` сам переключается на `mjpython`, который нужен интерактивному viewer на macOS. Доступные карты:
-
-- `corridor` — прямой коридор и цель в конце;
-- `turn_corridor` — цель требует поворота;
-- `slalom` — чередующиеся препятствия;
-- `blocked_goal` — цель закрыта препятствием;
-- `random` — процедурно созданная арена.
-
-## Оценка без окна viewer
+Из папки проекта:
 
 ```bash
 conda activate flybrain
-cd /Users/leonard/Desktop/DigitalFlyCar
-python run.py evaluate --suite scenarios
-python run.py evaluate --scenario corridor
-python run.py evaluate --suite random --episodes 20
-```
-
-Команда возвращает ненулевой код, если успешность ниже 75%.
-`--episodes` задаёт число только для случайных арен; каждая фиксированная карта запускается один раз.
-
-## Тесты
-
-```bash
-conda activate flybrain
-cd /Users/leonard/Desktop/DigitalFlyCar
+python run.py sim --scenario corridor --dashboard
+python run.py sim --scenario random --seed 12
+python run.py sim --scenario slalom --genome path/to/genome.json
 python run.py test
 ```
+
+На macOS `run.py` переключается на `mjpython` для viewer. Карты: `corridor` — прямой коридор; `turn_corridor` — поворот; `slalom` — чередующиеся препятствия; `blocked_goal` — закрытая цель; `random` — процедурная арена. Единственный поддерживаемый `--target` — `red_ball`.
+
+## Знакомство с окружением
+
+По умолчанию симулятор загружает `.local/familiarity.json` в папке проекта и атомарно сохраняет его при нормальном закрытии или Ctrl-C. Файл ограничен по размеру и числу записей, имеет проверяемую версию формата. Новая миссия получает свежие компас, motion и нейронное состояние, сохраняя знакомство с видами.
+
+```bash
+python run.py sim --dashboard --memory path/to/familiarity.json
+python run.py sim --dashboard --reset-memory
+```
+
+`--reset-memory` переносит старый файл в соседний `*.backup-*`, затем начинает пустое хранилище; резервную копию можно восстановить переименованием. Повреждённый файл вызывает диагностическую ошибку и остаётся нетронутым. Оценка использует отдельную пустую память для каждой карты и не читает интерактивное хранилище.
+
+## Оценка и эволюция
+
+```bash
+python run.py evaluate --suite type-a
+python run.py evaluate --suite type-b
+python run.py evaluate --suite train --episodes 20 --start-seed 0
+python run.py evaluate --suite scenarios
+python run.py evaluate --scenario corridor --genome path/to/genome.json
+python run.py evolve --config path/to/evolution-config.json --out path/to/results
+```
+
+Эволюция использует тренировочные карты. JSON конфигурация соответствует `EvolutionConfig`; сохраняются checkpoint и `best-genome.json`. Для воспроизводимости фиксируй конфигурацию, seed и геном. `type-a` и `type-b` — фиксированные наборы по 10 карт; `--episodes` выбирает первые N. `train` и `random` генерируют N карт, `scenarios` запускает каждую именованную карту один раз.
+
+Оценка выводит JSON каждой попытки и итог. Нулевой код требует успешность не ниже 90% для Type-A, 70% для Type-B, 75% для остальных наборов и отсутствие столкновений и проникновений. `--required-rate` меняет порог успешности. Порог приёмки не является заявлением о достигнутом результате; измеренные результаты кандидата документируются отдельно после проверки.

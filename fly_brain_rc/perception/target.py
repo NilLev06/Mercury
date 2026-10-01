@@ -1,6 +1,7 @@
 """Target detection interface and the simulator's red-ball backend."""
 
 from typing import Protocol
+import math
 
 import cv2
 import numpy as np
@@ -17,6 +18,10 @@ class MockRedBallDetector:
     """HSV detector for the simulator's red ball, isolated from the brain."""
 
     def __init__(self, min_area_ratio: float = 0.001):
+        if (isinstance(min_area_ratio, bool)
+                or not isinstance(min_area_ratio, (int, float))
+                or not math.isfinite(min_area_ratio) or min_area_ratio <= 0):
+            raise ValueError('min_area_ratio must be finite and positive')
         self.min_area_ratio = min_area_ratio
 
     def detect(self, frame: SensorFrame, target_class: str) -> ObjectObservation | None:
