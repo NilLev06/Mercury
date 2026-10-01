@@ -2,7 +2,6 @@
 import argparse
 import sys
 import time
-from pathlib import Path
 import mujoco.viewer
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
@@ -27,7 +26,7 @@ def main():
     parser.add_argument('--genome')
     parser.add_argument('--target', choices=('red_ball',), default='red_ball')
     parser.add_argument('--dashboard', action='store_true')
-    parser.add_argument('--memory', default=str(Path(__file__).resolve().parents[1] / '.local' / 'familiarity.json'))
+    parser.add_argument('--memory', metavar='PATH')
     parser.add_argument('--reset-memory', action='store_true')
     args = parser.parse_args()
     try:

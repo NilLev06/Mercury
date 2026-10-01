@@ -7,6 +7,10 @@ from fly_brain_rc.memory import FamiliarityMemory
 
 
 def open_memory(path, *, reset=False):
+    if path is None:
+        if reset:
+            raise ValueError('--reset-memory requires --memory PATH')
+        return FamiliarityMemory()
     path = Path(path)
     if reset and path.exists():
         stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
@@ -22,6 +26,8 @@ def open_memory(path, *, reset=False):
 
 
 def save_memory(memory, path):
+    if path is None:
+        return
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     memory.save(path)

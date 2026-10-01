@@ -11,6 +11,11 @@ import run
 
 
 class MemoryCliTests(unittest.TestCase):
+    def test_plain_launcher_defaults_to_ephemeral_memory(self):
+        with patch('sys.argv', ['run.py', 'sim']), patch('run._run_simulator', return_value=0) as launch:
+            self.assertEqual(run.main(), 0)
+        self.assertIsNone(launch.call_args.args[0].memory)
+
     def test_launcher_forwards_memory_and_reset_to_viewer(self):
         with patch('sys.argv', ['run.py', 'sim', '--memory', '/tmp/test-memory.json', '--reset-memory']), patch.dict('os.environ', {'MJPYTHON_BIN': 'test'}), patch('scripts.fly_mode.main') as launch:
             self.assertEqual(run.main(), 0)
@@ -37,6 +42,19 @@ class MemoryCliTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 open_memory(path)
             self.assertEqual(path.read_text(), 'bad')
+
+    def test_disabled_persistence_never_reads_or_saves(self):
+        with patch('scripts.memory_store.Path') as filesystem, patch('scripts.memory_store.FamiliarityMemory.load') as load, patch('scripts.memory_store.FamiliarityMemory.save') as save:
+            memory = open_memory(None)
+            memory.observe(np.ones(64), 0.0)
+            save_memory(memory, None)
+        load.assert_not_called()
+        save.assert_not_called()
+        filesystem.assert_not_called()
+
+    def test_reset_requires_explicit_memory(self):
+        with self.assertRaisesRegex(ValueError, '--reset-memory requires --memory'):
+            open_memory(None, reset=True)
 
     def test_detector_requires_positive_finite_ratio(self):
         for value in (0, -1, float('nan'), float('inf'), True):

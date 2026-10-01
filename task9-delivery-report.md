@@ -6,7 +6,7 @@ This delivery covers user commands, README, dashboard double-click launch, disk 
 
 The launcher resolves its project directory from its own location and uses the existing flybrain environment at `/opt/miniconda3/envs/flybrain/bin/python`. Its command now includes `--dashboard`. `run.py` already relaunches through `mjpython` on macOS; both the macOS relaunch and direct viewer path now forward memory settings.
 
-Interactive simulation defaults to `.local/familiarity.json` under the current project root. `--memory PATH` chooses a different store, and `--reset-memory` moves the existing store to a unique timestamped adjacent backup. `.local/` is ignored. A corrupt or unsupported store fails before constructing the environment and names the reset recovery command, preserving the original file.
+Plain CLI simulation defaults to ephemeral familiarity without filesystem reads or saves. The double-click launcher explicitly passes `--memory .local/familiarity.json` to preserve user-facing familiarity under the current project root. `--memory PATH` opts CLI runs into persistence, and `--reset-memory` requires an explicit memory path and moves the existing store to a unique timestamped adjacent backup. `.local/` is ignored. A corrupt or unsupported store fails before constructing the environment and names the reset recovery command, preserving the original file.
 
 `scripts/memory_store.py` wraps the existing bounded, versioned `FamiliarityMemory` loader and atomic saver. It does not persist compass, target trace, threat state, neural populations, motor commands or weights. One familiarity object is shared across freshly constructed episode runtimes. Normal viewer shutdown and KeyboardInterrupt save the store; unexpected exceptions do not replace it. No runtime.py edits were required.
 
@@ -23,3 +23,7 @@ Interactive simulation defaults to `.local/familiarity.json` under the current p
 ## Remaining release verification
 
 The parent release task should run final combined tests after tuning edits, measure its chosen candidate on held-out suites under the agreed rules, and perform GUI verification. This delivery does not claim that a GUI session was inspected. The README documents measured-rate thresholds as requirements rather than unverified performance achievements.
+
+## Persistence review revision
+
+Release review reconciled explicit opt-in CLI persistence with the user's persistent double-click experience. Added red-first regressions for disabled storage and reset without an explicit path, then implemented the `None` lifecycle without any Path, load, or save calls. Added a CLI default regression. All seven delivery tests pass; CLI forwarding only emits `--memory` when supplied. README and launcher now show the final contract.
