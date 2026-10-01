@@ -61,6 +61,9 @@ class NeuralFlyBrain:
         size = min(1.0, area / g.arrival_area)
         proximity = float(np.clip(1 - sensor.tof / g.proximity_distance, 0, 1))
         threat_input = max(float(np.clip(motion.looming, 0, 1)), proximity, float(sensor.contact))
+        sensory_threat = max(old['looming'], old['proximity'], old['contact'])
+        displacement = math.tanh(math.hypot(*self.compass.home_vector))
+        return_familiarity = (1 - displacement) * old['habituation']
         novelty = float(np.sum(self.compass.activity * (1 - self._visits)))
         # All recurrent drives read the same snapshot. Sensory feed-through
         # permits immediate threat response without sequential population updates.
@@ -71,19 +74,21 @@ class NeuralFlyBrain:
                             ('looming', motion.looming), ('proximity', proximity), ('contact', float(sensor.contact)),
                             ('familiarity', familiarity)):
             drive[name] += g.sensory_gain * float(np.clip(value, 0, 1))
-        drive['habituation'] += 6 * familiarity + 2 * old['habituation']
-        drive['exploration'] += g.exploration_gain * (1 - familiarity + novelty) - 4 * old['threat'] - 2 * old['habituation']
-        drive['threat'] += g.threat_gain * threat_input + 2 * old['threat']
+        drive['habituation'] += 6 * familiarity + old['familiarity'] + 2 * old['habituation']
+        drive['exploration'] += g.exploration_gain * (1 - familiarity + novelty + displacement) - 4 * old['threat'] - 2 * old['habituation'] - old['familiarity'] - return_familiarity
+        drive['threat'] += g.threat_gain * threat_input + 2 * (old['threat'] + sensory_threat)
         # Slow asymmetry and directional visitation break exploration ties.
         turn = 0.15 + float(np.sum((1 - self._visits) * np.sin(relative)) / len(relative))
         avoidance = math.tanh(motion.flow_left - motion.flow_right + 0.15)
         exploration = old['exploration'] * (1 - confidence)
-        steering_drive = g.target_gain * (right - left + memory_right - memory_left) + exploration * turn + threat_input * avoidance
+        steering_drive = g.target_gain * (right - left + memory_right - memory_left +
+                                          0.5 * (old['target_right'] - old['target_left'])) + exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
         drive['motor_right'] = -2 + steering_drive - 2 * old['motor_left']
         drive['motor_left'] = -2 - steering_drive - 2 * old['motor_right']
         braking = confidence * min(2.0, area / g.arrival_area)
-        drive['motor_forward'] = -2 + 4 * confidence + g.exploration_gain * exploration - 4 * braking - g.threat_gain * threat_input - 2 * old['threat']
-        drive['motor_reverse'] = -4 + 2 * braking + g.threat_gain * threat_input + 2 * old['threat']
+        sensory_approach = old['target_center'] - old['target_size']
+        drive['motor_forward'] = -2 + 4 * confidence + sensory_approach + g.exploration_gain * exploration - 4 * braking - g.threat_gain * threat_input - 2 * (old['threat'] + sensory_threat) - old['flow_center']
+        drive['motor_reverse'] = -4 + 2 * braking + g.threat_gain * threat_input + 2 * (old['threat'] + sensory_threat)
         tau = np.full(len(self.POPULATIONS), g.tau)
         tau[self.POPULATIONS.index('habituation')] = 1 / g.habituation_rate
         next_state = RateLayer(tau=tau).step(self._state, np.zeros((len(tau), len(tau))),

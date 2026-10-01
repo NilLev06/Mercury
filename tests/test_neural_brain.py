@@ -1,5 +1,6 @@
 import json
 import unittest
+from dataclasses import replace
 
 import numpy as np
 
@@ -86,3 +87,22 @@ class NeuralBrainTests(unittest.TestCase):
         self.assertGreater(novel.populations['exploration'], known.populations['exploration'])
         self.assertGreater(command.traction, 0)
         self.assertNotEqual(command.steering, 0)
+
+    def test_encoder_history_changes_exploration_with_identical_current_view(self):
+        traveled, stationary = NeuralFlyBrain(), NeuralFlyBrain()
+        sensor, _, motion = inputs()
+        for _ in range(100):
+            traveled.step(replace(sensor, encoder_delta=0.02), None, motion, 0.5, 0.02)
+            stationary.step(sensor, None, motion, 0.5, 0.02)
+        moving_command, moving_telemetry = traveled.step(sensor, None, motion, 0.5, 0.02)
+        still_command, still_telemetry = stationary.step(sensor, None, motion, 0.5, 0.02)
+        self.assertGreater(moving_telemetry.populations['exploration'], still_telemetry.populations['exploration'])
+        self.assertGreater(moving_command.traction, still_command.traction)
+
+    def test_sensory_gain_changes_motor_response(self):
+        low = NeuralFlyBrain(FlyGenome(sensory_gain=0.1))
+        high = NeuralFlyBrain(FlyGenome(sensory_gain=12.0))
+        for _ in range(100):
+            low_command, _ = low.step(*inputs(bearing=0.7), 0, 0.02)
+            high_command, _ = high.step(*inputs(bearing=0.7), 0, 0.02)
+        self.assertGreater(high_command.steering, low_command.steering + 0.01)
