@@ -233,7 +233,7 @@ The dashboard runs during MuJoCo simulation and later against the physical backe
 - traction, steering, speed, encoder, IMU, and ToF telemetry
 - episode time, acquisition state, stable-arrival timer, and result
 
-The dashboard communicates through the telemetry bus and mission-control API. It cannot issue direct traction or steering commands. The implementation should use a small HTTP server and WebSocket stream without requiring a frontend build toolchain.
+The dashboard communicates through the telemetry bus and mission-control API. It cannot issue direct traction or steering commands. The implementation uses the standard-library HTTP server and a Server-Sent Events telemetry stream, without a frontend build toolchain or an extra web framework.
 
 ## Commands
 
