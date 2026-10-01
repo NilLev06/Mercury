@@ -3,5 +3,6 @@ __pycache__/
 MUJOCO_LOG.TXT
 .env
 .DS_Store
+.worktrees/
 figures/*diagnostic*.png
 figures/*bicycle_*.png
