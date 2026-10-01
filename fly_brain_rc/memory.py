@@ -15,7 +15,7 @@ import tempfile
 import numpy as np
 
 
-_FORMAT_VERSION = 1
+_FORMAT_VERSION = 2
 _DESCRIPTOR_SIZE = 64
 _MAX_CAPACITY = 4096
 _MAX_FILE_BYTES = 16 * 1024 * 1024
@@ -52,6 +52,7 @@ class FamiliarityMemory:
         self.decay_rate = float(decay_rate)
         self.strength_increment = float(strength_increment)
         self._entries: list[FamiliarityEntry] = []
+        self._saved_ages: list[float] | None = None
 
     @property
     def entries(self) -> tuple[FamiliarityEntry, ...]:
@@ -72,6 +73,12 @@ class FamiliarityMemory:
         if not math.isfinite(norm) or norm <= 0.0:
             raise ValueError("descriptor must have finite nonzero magnitude")
         vector = vector / norm
+        if self._saved_ages is not None:
+            self._entries = [
+                FamiliarityEntry(entry.descriptor, entry.strength, float(now) - age)
+                for entry, age in zip(self._entries, self._saved_ages)
+            ]
+            self._saved_ages = None
 
         if self._entries:
             similarities = [float(np.dot(vector, entry.descriptor)) for entry in self._entries]
@@ -98,14 +105,19 @@ class FamiliarityMemory:
         return 0.0
 
     def _decayed_strength(self, entry: FamiliarityEntry, now: float) -> float:
-        # Episode clocks may restart after a saved memory is loaded. A clock
-        # restart cannot increase strength or apply a negative elapsed time.
+        # A loaded store is rebased to the current episode clock before this
+        # method is called. Clock restarts cannot create negative elapsed time.
         elapsed = max(0.0, now - entry.last_seen)
         return entry.strength * math.exp(-self.decay_rate * elapsed)
 
     def save(self, path: Path) -> None:
         """Atomically replace a versioned JSON memory file beside its temp file."""
         path = Path(path)
+        if self._saved_ages is None:
+            reference = max((entry.last_seen for entry in self._entries), default=0.0)
+            ages = [reference - entry.last_seen for entry in self._entries]
+        else:
+            ages = self._saved_ages
         payload = {
             "version": _FORMAT_VERSION,
             "capacity": self.capacity,
@@ -116,9 +128,9 @@ class FamiliarityMemory:
                 {
                     "descriptor": entry.descriptor.tolist(),
                     "strength": entry.strength,
-                    "last_seen": entry.last_seen,
+                    "age": age,
                 }
-                for entry in self._entries
+                for entry, age in zip(self._entries, ages)
             ],
         }
         temporary: Path | None = None
@@ -148,7 +160,7 @@ class FamiliarityMemory:
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ValueError("invalid memory JSON") from exc
         if (not isinstance(payload, dict) or type(payload.get("version")) is not int
-                or payload["version"] != _FORMAT_VERSION):
+                or payload["version"] not in (1, _FORMAT_VERSION)):
             raise ValueError("unsupported memory format version")
         if set(payload) != {
             "version", "capacity", "match_threshold", "decay_rate", "strength_increment", "entries"
@@ -164,8 +176,11 @@ class FamiliarityMemory:
             entries = payload["entries"]
             if not isinstance(entries, list) or len(entries) > memory.capacity:
                 raise ValueError("memory entries exceed capacity")
+            ages = []
+            old_timestamps = []
+            metadata_field = "last_seen" if payload["version"] == 1 else "age"
             for item in entries:
-                if not isinstance(item, dict) or set(item) != {"descriptor", "strength", "last_seen"}:
+                if not isinstance(item, dict) or set(item) != {"descriptor", "strength", metadata_field}:
                     raise ValueError("invalid memory entry")
                 values = item["descriptor"]
                 if not isinstance(values, list) or len(values) != _DESCRIPTOR_SIZE:
@@ -177,13 +192,23 @@ class FamiliarityMemory:
                 if not math.isfinite(norm) or norm <= 0.0:
                     raise ValueError("memory descriptor must have finite nonzero magnitude")
                 strength = item["strength"]
-                last_seen = item["last_seen"]
+                metadata = item[metadata_field]
                 if (not _finite_number(strength) or not 0.0 < strength <= _MAX_STRENGTH
-                        or not _finite_number(last_seen) or last_seen < 0.0):
+                        or not _finite_number(metadata) or metadata < 0.0):
                     raise ValueError("invalid memory entry metadata")
+                if payload["version"] == 1:
+                    old_timestamps.append(float(metadata))
+                else:
+                    ages.append(float(metadata))
                 memory._entries.append(
-                    FamiliarityEntry(descriptor / norm, float(strength), float(last_seen))
+                    FamiliarityEntry(descriptor / norm, float(strength), 0.0)
                 )
+            if payload["version"] == 1:
+                latest = max(old_timestamps, default=0.0)
+                ages = [latest - timestamp for timestamp in old_timestamps]
+            if not all(math.isfinite(age) for age in ages):
+                raise ValueError("invalid memory ages")
+            memory._saved_ages = ages
         except (TypeError, OverflowError) as exc:
             raise ValueError("invalid memory data") from exc
         return memory

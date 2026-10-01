@@ -74,6 +74,33 @@ class FamiliarityMemoryTests(unittest.TestCase):
             self.assertEqual(loaded.capacity, 2)
             self.assertGreater(loaded.observe(unit_vector(3), now=4.0), 0.0)
 
+    def test_loaded_age_decays_when_episode_clock_restarts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "familiarity.json"
+            memory = FamiliarityMemory(capacity=2, decay_rate=1.0)
+            memory.observe(unit_vector(0), now=900.0)
+            memory.observe(unit_vector(1), now=1000.0)
+            memory.save(path)
+
+            loaded = FamiliarityMemory.load(path)
+            old = loaded.observe(unit_vector(0), now=0.0)
+            recent = loaded.observe(unit_vector(1), now=0.0)
+            self.assertLess(old, recent)
+
+    def test_loaded_age_controls_eviction_when_episode_clock_restarts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "familiarity.json"
+            memory = FamiliarityMemory(capacity=2, decay_rate=1.0)
+            for _ in range(5):
+                memory.observe(unit_vector(0), now=900.0)
+            memory.observe(unit_vector(1), now=1000.0)
+            memory.save(path)
+
+            loaded = FamiliarityMemory.load(path)
+            loaded.observe(unit_vector(2), now=0.0)
+            self.assertGreater(loaded.observe(unit_vector(1), now=0.0), 0.0)
+            self.assertEqual(loaded.observe(unit_vector(0), now=0.0), 0.0)
+
     def test_failed_atomic_replace_preserves_previous_file(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "familiarity.json"
