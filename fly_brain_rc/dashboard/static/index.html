@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Digital Fly Car telemetry</title>
+<style>
+body{font:16px system-ui;background:#101721;color:#e8edf5;margin:24px}button,select{font:inherit;padding:8px;margin:4px}main{display:flex;flex-wrap:wrap;gap:24px}section{background:#1b2635;padding:18px;border-radius:12px}canvas{max-width:100%;background:#090e15}#population div{display:flex;gap:12px;margin:5px}meter{width:180px}pre{white-space:pre-wrap}small{color:#9aafc7}
+</style>
+<h1>Digital Fly Car</h1><p>Live neural telemetry · <span id="connection">connecting</span></p>
+<select id="target"><option value="red_ball">Red ball</option></select>
+<button id="start">Start mission</button><button id="stop">Stop mission</button>
+<p id="mission">Loading mission…</p><main>
+<section><h2>Camera and target</h2><canvas id="camera" width="640" height="480"></canvas><p id="observation"></p></section>
+<section><h2>Compass ring</h2><canvas id="ring" width="320" height="320"></canvas><h2>Populations</h2><div id="population"></div></section>
+<section><h2>Sensors and motion</h2><pre id="sensor"></pre><h2>Motor output</h2><pre id="motor"></pre><small>Outputs are read-only. Mission buttons are the only controls.</small></section>
+</main>
+<script>
+const el=id=>document.getElementById(id), camera=el('camera').getContext('2d'), ring=el('ring').getContext('2d');
+async function command(path,body){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const state=await r.json();if(!r.ok)throw Error(state.error);mission(state)}catch(e){el('mission').textContent=e.message}}
+el('start').onclick=()=>command('/api/mission/start',{target_class:el('target').value});
+el('stop').onclick=()=>command('/api/mission/stop',{});
+function mission(m){el('mission').textContent=`Mission: ${m.status} | Acquisition: ${m.acquisition_time??'—'} s | Stable stop: ${(m.arrival_elapsed||0).toFixed(2)} / 3.00 s | Result: ${m.result?JSON.stringify(m.result):'pending'}`}
+fetch('/api/state').then(r=>r.json()).then(mission);
+const events=new EventSource('/api/telemetry');events.onopen=()=>el('connection').textContent='connected';events.onerror=()=>el('connection').textContent='reconnecting';
+events.onmessage=e=>{const d=JSON.parse(e.data);mission(d.mission);const b=d.brain,s=d.sensor,t=d.target;
+ if(d.preview){const image=new Image();image.onload=()=>{camera.drawImage(image,0,0,640,480);const overlay=d.preview_target;if(overlay){const [x,y,right,bottom]=overlay.bbox;camera.strokeStyle='#ffcb5b';camera.lineWidth=3;camera.strokeRect(x*640,y*480,(right-x)*640,(bottom-y)*480)}};image.src=d.preview}
+ el('observation').textContent=t?`${t.class_name} · confidence ${t.confidence.toFixed(2)} · bearing ${t.bearing.toFixed(3)} · area ${t.apparent_area.toFixed(3)}`:'Target not visible';
+ ring.clearRect(0,0,320,320);const values=b.compass_ring, n=values.length, max=Math.max(...values,1e-6);values.forEach((v,i)=>{const a=2*Math.PI*i/n-Math.PI/2;ring.beginPath();ring.strokeStyle='#62d8ba';ring.lineWidth=5;ring.moveTo(160+50*Math.cos(a),160+50*Math.sin(a));ring.lineTo(160+(50+85*v/max)*Math.cos(a),160+(50+85*v/max)*Math.sin(a));ring.stroke()});
+ el('population').replaceChildren(...Object.entries(b.populations).map(([name,value])=>{const row=document.createElement('div'), label=document.createElement('span'),bar=document.createElement('meter');label.textContent=name+' '+value.toFixed(3);bar.min=0;bar.max=1;bar.value=value;row.append(label,bar);return row}));
+ el('sensor').textContent=JSON.stringify({sequence:d.sequence,timestamp:d.timestamp,...s,motion:d.motion,familiarity:b.familiarity,habituation:b.habituation,threat:b.threat,path_integration:b.path_integration},null,2);
+ el('motor').textContent=JSON.stringify({left:b.motor_left,right:b.motor_right,forward:b.motor_forward,reverse:b.motor_reverse,...d.command},null,2);
+};
+</script></html>

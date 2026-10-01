@@ -6,6 +6,16 @@ import run
 
 
 class EvaluationTests(unittest.TestCase):
+    def test_dashboard_attach_opens_running_server(self):
+        with patch('sys.argv', ['run.py', 'dashboard', '--attach', 'localhost:8123']), patch('webbrowser.open', return_value=True) as opened:
+            self.assertEqual(run.main(), 0)
+        opened.assert_called_once_with('http://localhost:8123/')
+
+    def test_sim_dashboard_reaches_viewer_parser(self):
+        with patch('sys.argv', ['run.py', 'sim', '--dashboard']), patch('run._run_simulator', return_value=0) as launch:
+            self.assertEqual(run.main(), 0)
+        self.assertTrue(launch.call_args.args[0].dashboard)
+
     def test_suite_rates_and_explicit_override(self):
         self.assertEqual(suite_required_rate('type-a'), .9)
         self.assertEqual(suite_required_rate('type-b'), .7)

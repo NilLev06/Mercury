@@ -24,11 +24,20 @@ def main():
     parser.add_argument('--follow', action='store_true', default=True)
     parser.add_argument('--genome')
     parser.add_argument('--target', choices=('red_ball',), default='red_ball')
+    parser.add_argument('--dashboard', action='store_true')
     args = parser.parse_args()
     genome = load_genome(args.genome)
     env = FlyCarEnv(SIM, DRIVE, seed=args.seed,
                     scenario=get_scenario(args.scenario) if args.scenario else None)
+    dashboard = None
     try:
+        if args.dashboard:
+            import webbrowser
+            from fly_brain_rc.telemetry import TelemetryBus
+            from fly_brain_rc.dashboard.server import DashboardServer, MissionController
+            bus, mission = TelemetryBus(), MissionController(running=True)
+            dashboard = DashboardServer(bus, mission).start()
+            webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
         with mujoco.viewer.launch_passive(env.m, env.d) as viewer:
             viewer.cam.azimuth, viewer.cam.elevation, viewer.cam.distance = -30, -55, 5.5
             for episode in range(args.max_episodes):
@@ -42,7 +51,9 @@ def main():
                     env.d.qpos[:] = 0
                     env._sync_kinematic()
                     env._last_encoder_position = env._encoder_position()
-                runtime = FlyRuntime(env, NeuralFlyBrain(genome), target=args.target)
+                runtime = FlyRuntime(env, NeuralFlyBrain(genome), target=args.target,
+                                     emit=bus.publish if dashboard else None,
+                                     mission=mission if dashboard else None)
                 def display(record):
                     if not alive(viewer):
                         raise KeyboardInterrupt
@@ -50,6 +61,19 @@ def main():
                         viewer.cam.lookat[:2] = env.car_pose()[:2]
                     viewer.sync()
                     time.sleep(DRIVE.timestep)
+                if dashboard:
+                    generation, active_steps = mission.generation, 0
+                    while alive(viewer):
+                        state = mission.state()
+                        if state['generation'] != generation:
+                            generation, active_steps = state['generation'], 0
+                        record = runtime.tick()
+                        if state['status'] == 'running':
+                            active_steps += 1
+                            if active_steps >= SIM.episode_steps and mission.state()['status'] == 'running':
+                                mission.finish({'stable_arrival': False, 'reason': 'step_limit'}, generation=generation)
+                        display(record)
+                    break
                 result = run_episode(runtime, SIM.episode_steps, on_tick=display)
                 print(f'episode {episode}: {result}')
             if alive(viewer) and not args.close_on_finish:
@@ -58,6 +82,8 @@ def main():
                     viewer.sync()
                     time.sleep(.05)
     finally:
+        if dashboard:
+            dashboard.close()
         env.renderer.close()
 
 

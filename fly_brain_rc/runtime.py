@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import math
 
-from .contracts import RuntimeTelemetry
+from .contracts import RuntimeTelemetry, ActuatorCommand
+from contextlib import nullcontext
 from .memory import FamiliarityMemory
 from .neural.brain import NeuralFlyBrain, ArrivalTracker
 from .neural.genome import FlyGenome
@@ -18,7 +19,7 @@ def load_genome(path=None):
 
 class FlyRuntime:
     def __init__(self, env, brain=None, dt=None, target='red_ball', *, detector=None,
-                 motion=None, descriptor=None, memory=None, emit=None):
+                 motion=None, descriptor=None, memory=None, emit=None, mission=None):
         self.env = env
         self.brain = brain if brain is not None else NeuralFlyBrain()
         self.dt = dt if dt is not None else env.drive.timestep
@@ -32,17 +33,52 @@ class FlyRuntime:
         self.descriptor = descriptor if descriptor is not None else VisualDescriptor()
         self.memory = memory if memory is not None else FamiliarityMemory()
         self.emit = emit
+        self.mission = mission
+        self.arrival = ArrivalTracker()
+        self._generation = -1
+        self._sequence = 0
+        self._acquisition_time = None
 
     def tick(self):
+        # Mission changes and actuator application are serialized. HTTP threads
+        # only change lifecycle state; the simulation thread owns all actuation.
+        with self.mission.lock if self.mission is not None else nullcontext():
+            record = self._tick()
+        if self.emit is not None:
+            self.emit(record)
+        return record
+
+    def _tick(self):
+        if self.mission is not None and self.mission.generation != self._generation:
+            self._generation = self.mission.generation
+            self.arrival.reset()
+            self._acquisition_time = None
+            self.motion = MotionEstimator()
+            if isinstance(self.brain, NeuralFlyBrain):
+                self.brain = NeuralFlyBrain(self.brain.genome)
         sensor = self.env.sensor_frame()
         target = self.detector.detect(sensor, self.target)
         motion = self.motion.update(sensor, self.dt)
         familiarity = self.memory.observe(self.descriptor.encode(sensor.gray), sensor.timestamp)
         command, brain = self.brain.step(sensor, target, motion, familiarity, self.dt)
+        if self.mission is not None:
+            self._sequence += 1
+            active = self.mission.status == 'running'
+            if active:
+                if target is not None and self._acquisition_time is None:
+                    self._acquisition_time = sensor.timestamp
+                arrived = self.arrival.update(target, command, sensor.encoder_delta / self.dt, sensor.tof, self.dt)
+                self.mission.arrival_elapsed = self.arrival.elapsed
+                self.mission.acquisition_time = self._acquisition_time
+                if arrived:
+                    self.mission.status = 'finished'
+                    self.mission.result = {'stable_arrival': True, 'timestamp': sensor.timestamp}
+            if not active or self.mission.status == 'finished':
+                command = ActuatorCommand(0, 0, sensor.timestamp, self._sequence)
+            else:
+                command = ActuatorCommand(command.traction, command.steering, command.timestamp, self._sequence)
         self.env.apply(command)
         record = RuntimeTelemetry(sensor.timestamp, command.sequence, sensor, target, motion, brain, command)
-        if self.emit is not None:
-            self.emit(record)
         return record
 
 

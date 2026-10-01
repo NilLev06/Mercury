@@ -30,6 +30,8 @@ def _run_simulator(args: argparse.Namespace) -> int:
         command += ["--target", args.target]
         if args.genome:
             command += ["--genome", args.genome]
+        if args.dashboard:
+            command += ['--dashboard']
         os.execv(command[0], command)
 
     from scripts.fly_mode import main as fly_main
@@ -40,6 +42,8 @@ def _run_simulator(args: argparse.Namespace) -> int:
         sys.argv += ["--genome", args.genome]
     if args.scenario:
         sys.argv += ["--scenario", args.scenario]
+    if args.dashboard:
+        sys.argv += ['--dashboard']
     fly_main()
     return 0
 
@@ -52,6 +56,9 @@ def main() -> int:
     sim.add_argument("--scenario", choices=("random", "blocked_goal", "corridor", "slalom", "turn_corridor"), default="corridor")
     sim.add_argument("--seed", type=int, default=0)
     sim.add_argument("--episodes", type=int, default=1)
+    sim.add_argument('--dashboard', action='store_true')
+    dashboard = subparsers.add_parser('dashboard', help='open a running simulation dashboard')
+    dashboard.add_argument('--attach', default='127.0.0.1:8765', metavar='HOST:PORT')
 
     evaluate = subparsers.add_parser("evaluate", help="run repeatable navigation benchmarks")
     evaluate.add_argument("--suite", choices=("train", "type-a", "type-b", "random", "scenarios"), default="type-a")
@@ -77,6 +84,17 @@ def main() -> int:
         if args.scenario == "random":
             args.scenario = None
         return _run_simulator(args)
+    if args.command == 'dashboard':
+        import webbrowser
+        from urllib.parse import urlsplit
+        address = urlsplit('http://' + args.attach)
+        try:
+            if not address.hostname or address.port is None or address.path or address.query or address.fragment or address.username:
+                raise ValueError
+        except ValueError:
+            parser.error('--attach must be HOST:PORT')
+        webbrowser.open('http://' + args.attach + '/')
+        return 0
     if args.command == "evaluate":
         command = [
             sys.executable, "-m", "scripts.evaluate", "--suite", args.suite,

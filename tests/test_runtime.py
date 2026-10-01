@@ -6,6 +6,23 @@ from fly_brain_rc.runtime import FlyRuntime, run_episode
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_stopped_mission_emits_safety_stop_and_restart_resets_arrival(self):
+        from fly_brain_rc.dashboard.server import MissionController
+        frame = SensorFrame(np.zeros((8, 8, 3), dtype=np.uint8), np.zeros((8, 8), dtype=np.uint8), 0, 0, 1, False, 0)
+        commands = []
+        env = SimpleNamespace(sensor_frame=lambda: frame, apply=commands.append)
+        mission = MissionController()
+        runtime = FlyRuntime(env, dt=.02, mission=mission)
+        runtime.tick()
+        self.assertEqual(commands[-1].traction, 0)
+        self.assertEqual(commands[-1].steering, 0)
+        mission.start('red_ball')
+        record = runtime.tick()
+        self.assertGreater(record.command.sequence, commands[0].sequence)
+        mission.stop()
+        runtime.tick()
+        self.assertEqual(commands[-1].traction, 0)
+
     def test_tick_reads_and_processes_once_and_emits_after_apply(self):
         calls = []
         frame = SensorFrame(np.zeros((8, 8, 3), dtype=np.uint8), np.zeros((8, 8), dtype=np.uint8), 0, 0, 1.2, False, 0)
