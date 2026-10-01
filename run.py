@@ -74,6 +74,9 @@ def main() -> int:
         command_parser.add_argument('--genome')
         command_parser.add_argument('--target', choices=('red_ball',), default='red_ball')
     subparsers.add_parser("test", help="run the automated test suite")
+    evolution = subparsers.add_parser('evolve', help='evolve neural parameters on training maps')
+    evolution.add_argument('--config', required=True)
+    evolution.add_argument('--out', required=True)
     args = parser.parse_args()
 
     os.chdir(PROJECT_ROOT)
@@ -84,6 +87,26 @@ def main() -> int:
         if args.scenario == "random":
             args.scenario = None
         return _run_simulator(args)
+    if args.command == 'evolve':
+        import json
+        from dataclasses import fields
+        from fly_brain_rc.evolution import EvolutionConfig, evolve
+        from scripts.evaluate import training_evaluator
+        try:
+            payload = json.loads(Path(args.config).read_text())
+            if set(payload) - {f.name for f in fields(EvolutionConfig)}:
+                raise ValueError('unknown evolution configuration fields')
+            output = Path(args.out)
+            output.mkdir(parents=True, exist_ok=True)
+            payload.setdefault('checkpoint', str(output / 'checkpoint.json'))
+            config = EvolutionConfig(**payload)
+            state = evolve(config, training_evaluator(config.steps))
+            best = max(zip(state.population, state.scores), key=lambda pair: pair[1].rank_key())
+            (output / 'best-genome.json').write_text(best[0].to_json())
+            print(json.dumps({'generation': state.generation, 'best': best[1].__dict__}, allow_nan=False))
+            return 0
+        except (ValueError, TypeError, OSError) as exc:
+            parser.error(str(exc))
     if args.command == 'dashboard':
         import webbrowser
         from urllib.parse import urlsplit

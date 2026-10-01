@@ -10,6 +10,34 @@ from fly_brain_rc.neural.brain import NeuralFlyBrain
 from fly_brain_rc.runtime import FlyRuntime, load_genome, run_episode
 
 
+def training_evaluator(steps):
+    """Build an evaluator that can only resolve generated training cases."""
+    from fly_brain_rc.evolution import GenomeScore
+    def evaluate(genome, identifiers):
+        successes = collisions = acquired = 0
+        completion = energy = reverse = variation = 0.0
+        for identifier in identifiers:
+            _, seed, index = identifier.split('-')
+            case = training_cases(int(seed), int(index) + 1)[int(index)]
+            env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario)
+            try:
+                def consume(record):
+                    nonlocal energy
+                    energy += (record.command.traction ** 2 + record.command.steering ** 2) * DRIVE.timestep
+                result = run_episode(FlyRuntime(env, NeuralFlyBrain(genome)), steps, on_tick=consume)
+            finally:
+                env.renderer.close()
+            successes += int(result.success)
+            collisions += result.collisions + result.penetrations
+            acquired += int(result.acquisition_time is not None)
+            completion += result.stable_stop_time if result.success else steps * DRIVE.timestep
+            reverse += result.reverse_distance
+            variation += result.steering_variation
+        return GenomeScore(successes, collisions, acquired / len(identifiers), completion,
+                           energy, reverse, variation)
+    return evaluate
+
+
 def episode_seeds(count, start=0):
     return list(range(start, start + count))
 
