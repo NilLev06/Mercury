@@ -55,3 +55,13 @@ class RuntimeTests(unittest.TestCase):
         result = run_episode(SimpleNamespace(env=env, dt=.02, tick=lambda: record), 2)
         self.assertFalse(result.success)
         self.assertIsNone(result.stable_stop_time)
+
+    def test_collision_or_penetration_invalidates_otherwise_stable_arrival(self):
+        from fly_brain_rc.neural.brain import ArrivalTracker
+        frame = SensorFrame(np.zeros((8, 8, 3)), np.zeros((8, 8)), 0, 0, 1, False, 0)
+        target = ObjectObservation('red_ball', 1, (0, 0, 1, 1), 0, .15, 0)
+        record = RuntimeTelemetry(0, 1, frame, target, MotionObservation(0, 0, 0, 0, 0, 0), BrainTelemetry(), ActuatorCommand(0, 0, 0, 1))
+        for collisions, penetrations in ((1, 0), (0, 1)):
+            env = SimpleNamespace(goal_distance=lambda: .1, sim_cfg=SimpleNamespace(goal_radius=.3), collisions=collisions, penetrations=penetrations)
+            result = run_episode(SimpleNamespace(env=env, dt=.02, tick=lambda: record), 1, arrival=ArrivalTracker(duration=.02))
+            self.assertFalse(result.success)

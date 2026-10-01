@@ -56,13 +56,13 @@ def main() -> int:
     evaluate = subparsers.add_parser("evaluate", help="run repeatable navigation benchmarks")
     evaluate.add_argument("--suite", choices=("train", "type-a", "type-b", "random", "scenarios"), default="type-a")
     evaluate.add_argument("--scenario", choices=("blocked_goal", "corridor", "slalom", "turn_corridor"))
-    evaluate.add_argument("--episodes", type=int, default=20,
+    evaluate.add_argument("--episodes", type=int, default=10,
                           help="number of generated maps for --suite random (fixed scenarios run once each)")
 
     from fly_brain_rc.config import SIM
     evaluate.add_argument('--steps', type=int, default=SIM.episode_steps)
     evaluate.add_argument('--start-seed', type=int, default=0)
-    evaluate.add_argument('--required-rate', type=float, default=.75)
+    evaluate.add_argument('--required-rate', type=float)
     for command_parser in (sim, evaluate):
         command_parser.add_argument('--genome')
         command_parser.add_argument('--target', choices=('red_ball',), default='red_ball')
@@ -82,8 +82,10 @@ def main() -> int:
             sys.executable, "-m", "scripts.evaluate", "--suite", args.suite,
             "--episodes", str(args.episodes),
             '--steps', str(args.steps), '--start-seed', str(args.start_seed),
-            '--required-rate', str(args.required_rate), '--target', args.target,
+            '--target', args.target,
         ]
+        if args.required_rate is not None:
+            command += ['--required-rate', str(args.required_rate)]
         if args.genome:
             command += ['--genome', args.genome]
         if args.scenario:

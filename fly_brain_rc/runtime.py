@@ -93,6 +93,7 @@ def run_episode(runtime, steps=1000, *, arrival=None, on_tick=None):
         if stable:
             stopped = now
             break
-    return EpisodeResult(stopped is not None and reached is not None, index + 1,
+    success = stopped is not None and reached is not None and env.collisions == 0 and env.penetrations == 0
+    return EpisodeResult(success, index + 1,
                          acquisition, reached, stopped, env.collisions, env.penetrations,
                          reverse, variation, novelty / (index + 1), minimum)
