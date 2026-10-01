@@ -51,6 +51,36 @@ class CompassTests(unittest.TestCase):
                 compass.update(**kwargs)
         np.testing.assert_array_equal(compass.home_vector, [0.0, 0.0])
 
+    def test_overflowing_turn_leaves_compass_state_unchanged(self):
+        compass = CompassState()
+        activity = compass.activity
+        heading = compass.heading
+        home = compass.home_vector
+
+        with self.assertRaises(ValueError):
+            compass.update(yaw_rate=1e308, optic_rotation=0.0,
+                           encoder_delta=0.0, dt=10.0)
+
+        np.testing.assert_array_equal(compass.activity, activity)
+        self.assertEqual(compass.heading, heading)
+        np.testing.assert_array_equal(compass.home_vector, home)
+
+    def test_overflowing_home_vector_leaves_compass_state_unchanged(self):
+        compass = CompassState()
+        compass.update(yaw_rate=0.0, optic_rotation=0.0,
+                       encoder_delta=1e308, dt=1.0)
+        activity = compass.activity
+        heading = compass.heading
+        home = compass.home_vector
+
+        with self.assertRaises(ValueError):
+            compass.update(yaw_rate=0.1, optic_rotation=0.0,
+                           encoder_delta=1e308, dt=1.0)
+
+        np.testing.assert_array_equal(compass.activity, activity)
+        self.assertEqual(compass.heading, heading)
+        np.testing.assert_array_equal(compass.home_vector, home)
+
 
 if __name__ == "__main__":
     unittest.main()

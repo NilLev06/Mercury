@@ -35,11 +35,21 @@ class RateLayer:
                 and np.isfinite(external).all()):
             raise ValueError("neural inputs must contain finite values")
 
-        drive = recurrent @ previous + external + self.bias
+        with np.errstate(over="ignore", invalid="ignore"):
+            drive = recurrent @ previous + external + self.bias
+        if not np.isfinite(drive).all():
+            raise ValueError("neural drive must remain finite")
         sigmoid = np.empty_like(drive)
         positive = drive >= 0.0
         sigmoid[positive] = 1.0 / (1.0 + np.exp(-drive[positive]))
         exp_drive = np.exp(drive[~positive])
         sigmoid[~positive] = exp_drive / (1.0 + exp_drive)
-        next_activity = previous + (dt / self.tau) * (sigmoid - previous)
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            scale = dt / self.tau
+        if not np.isfinite(scale).all():
+            raise ValueError("Euler scale must remain finite")
+        with np.errstate(over="ignore", invalid="ignore"):
+            next_activity = previous + scale * (sigmoid - previous)
+        if not np.isfinite(next_activity).all():
+            raise ValueError("next neural activity must remain finite")
         return np.clip(next_activity, 0.0, 1.0)

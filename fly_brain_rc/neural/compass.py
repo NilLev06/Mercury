@@ -44,14 +44,22 @@ class CompassState:
             raise ValueError("motion inputs must be finite and dt positive")
         optic_correction = self._OPTIC_GAIN * float(np.clip(optic_rotation, -1.0, 1.0))
         next_heading = self.heading + (yaw_rate + optic_correction) * dt
+        if not math.isfinite(next_heading):
+            raise ValueError("integrated heading must remain finite")
         next_activity = self._encode(next_heading)
+        if not np.isfinite(next_activity).all():
+            raise ValueError("compass activity must remain finite")
         decoded_heading = math.atan2(
             float(np.dot(next_activity, np.sin(self._preferred))),
             float(np.dot(next_activity, np.cos(self._preferred))),
         )
-        self._home_vector -= encoder_delta * np.array(
-            [math.cos(decoded_heading), math.sin(decoded_heading)]
-        )
+        with np.errstate(over="ignore", invalid="ignore"):
+            next_home_vector = self._home_vector - encoder_delta * np.array(
+                [math.cos(decoded_heading), math.sin(decoded_heading)]
+            )
+        if not np.isfinite(next_home_vector).all():
+            raise ValueError("home vector must remain finite")
+        self._home_vector = next_home_vector
         self._activity = next_activity
 
     def _encode(self, heading: float) -> np.ndarray:

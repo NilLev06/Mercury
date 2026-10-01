@@ -29,6 +29,11 @@ class RateLayerTests(unittest.TestCase):
         np.testing.assert_array_equal(result, [1.0, 0.0])
         self.assertTrue(np.isfinite(result).all())
 
+    def test_rejects_overflowing_euler_scale_instead_of_returning_nan(self):
+        layer = RateLayer(tau=1e-320)
+        with self.assertRaises(ValueError):
+            layer.step(np.array([0.5]), np.zeros((1, 1)), np.zeros(1), dt=1.0)
+
     def test_rejects_invalid_time_constants_and_input_shapes(self):
         for tau in (0.0, -1.0, float("nan"), float("inf")):
             with self.subTest(tau=tau), self.assertRaises(ValueError):
