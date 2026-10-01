@@ -1,12 +1,33 @@
 import unittest
 import math
+from unittest.mock import patch
 
 import mujoco
+import numpy as np
 
 from fly_brain_rc.config import DriveConfig, SimConfig
+from fly_brain_rc.contracts import ActuatorCommand, SensorFrame
 from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.sim.car_model import build_model_xml
 from fly_brain_rc.sim.kinematics import BicycleState
+from fly_brain_rc.sim.scenarios import Scenario
+
+
+class HeadlessRenderer:
+    """Replace only the unavailable CoreGraphics context in CI."""
+
+    def __init__(self, model, width, height):
+        self.frame = np.zeros((height, width, 3), dtype=np.uint8)
+        self.frame[..., 0] = 100
+
+    def update_scene(self, data, camera):
+        pass
+
+    def render(self):
+        return self.frame
+
+    def close(self):
+        pass
 
 
 class EnvironmentGeometryTests(unittest.TestCase):
@@ -89,6 +110,41 @@ class EnvironmentIntegrationTests(unittest.TestCase):
         self.env.step_kinematic(-1.0, 0.0, 0.1)
         self.assertLess(self.env.state.x, 0.0)
         self.assertFalse(self.env._contact_active)
+
+    def test_rendered_sensor_frame_has_only_embodied_readings(self):
+        with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
+            env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3,
+                            scenario=Scenario("sensor_test", (), (2.0, 0.0)), render=True)
+        try:
+            frame = env.sensor_frame()
+            self.assertIsInstance(frame, SensorFrame)
+            self.assertEqual(frame.rgb.shape, (96, 128, 3))
+            self.assertEqual(frame.gray.shape, (96, 128))
+            self.assertEqual(frame.yaw_rate, 0.0)
+            self.assertEqual(frame.encoder_delta, 0.0)
+            self.assertFalse(frame.contact)
+            self.assertGreater(frame.tof, 0.0)
+            self.assertEqual(frame.timestamp, 0.0)
+            self.assertFalse(hasattr(frame, "goal_distance"))
+            self.assertAlmostEqual(env.goal_distance(), 2.0)
+        finally:
+            if env.renderer is not None:
+                env.renderer.close()
+
+    def test_apply_returns_next_sensor_frame_with_encoder_displacement(self):
+        with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
+            env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3,
+                            scenario=Scenario("sensor_test", (), (2.0, 0.0)), render=True)
+        try:
+            initial = env.sensor_frame()
+            frame = env.apply(ActuatorCommand(traction=1.0, steering=0.0, timestamp=0.0, sequence=1))
+            self.assertIsInstance(frame, SensorFrame)
+            self.assertGreater(frame.timestamp, initial.timestamp)
+            self.assertGreater(frame.encoder_delta, 0.0)
+            self.assertLess(env.goal_distance(), 2.0)
+        finally:
+            if env.renderer is not None:
+                env.renderer.close()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import numpy as np
 import mujoco
 
 from ..config import SimConfig, DriveConfig
+from ..contracts import ActuatorCommand, SensorFrame
 from .car_model import build_model_xml
 from .kinematics import BicycleState, step_bicycle, yaw_quaternion
 from .scenarios import Scenario
@@ -95,6 +96,7 @@ class FlyCarEnv:
         x, y = self.start_pose[0], self.start_pose[1]
         self.d.qpos[0], self.d.qpos[1] = x, y
         self._sync_kinematic()
+        self._last_encoder_position = self._encoder_position()
         if self.renderer is not None:
             self.renderer.close()
         self.renderer = (
@@ -166,6 +168,44 @@ class FlyCarEnv:
     def car_pose(self):
         x, y = float(self.d.qpos[0]), float(self.d.qpos[1])
         return x, y, self._yaw()
+
+    def goal_distance(self) -> float:
+        """Ground truth for episode evaluation, outside the sensor contract."""
+        x, y, _ = self.car_pose()
+        gx, gy = self.goal
+        return math.hypot(gx - x, gy - y)
+
+    def _encoder_position(self) -> float:
+        rear_wheel_angle = (float(self.d.qpos[self.jq_wl]) + float(self.d.qpos[self.jq_wr])) / 2.0
+        return rear_wheel_angle * self.drive.wheel_radius
+
+    def sensor_frame(self) -> SensorFrame:
+        if self.renderer is None:
+            raise RuntimeError("sensor_frame requires a camera renderer")
+        self.renderer.update_scene(self.d, camera="eye")
+        rgb = np.asarray(self.renderer.render(), dtype=np.uint8)
+        center_range = float(self.d.sensordata[self.adr_b_fc])
+        tof = center_range if 0.0 < center_range < 1.2 else 1.2
+        yaw_rate = (
+            self._w_cmd_prev if self.sim_cfg.kinematic
+            else float(self.d.sensordata[self.adr_gyro])
+        )
+        encoder_position = self._encoder_position()
+        encoder_delta = encoder_position - self._last_encoder_position
+        self._last_encoder_position = encoder_position
+        return SensorFrame(
+            rgb=rgb,
+            gray=cv_gray(rgb),
+            yaw_rate=yaw_rate,
+            encoder_delta=encoder_delta,
+            tof=tof,
+            contact=self._contact_active,
+            timestamp=self.sim_steps * self.drive.timestep,
+        )
+
+    def apply(self, command: ActuatorCommand) -> SensorFrame:
+        self.step(command.traction, command.steering)
+        return self.sensor_frame()
 
     def step(self, throttle: float, steer: float, ctrl_substeps: int = 1):
         dt = self.drive.timestep
