@@ -34,6 +34,21 @@ def square_frame(center_x: int, size: int, timestamp: float) -> SensorFrame:
 
 
 class PerceptionTests(unittest.TestCase):
+    def test_perspective_yaw_flow_is_removed_before_looming(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        estimator = MotionEstimator()
+        frame = square_frame(64, 24, 0)
+        estimator.update(frame, .1)
+        yy, xx = np.indices((32, 64), dtype=np.float32)
+        fy = 32 / (2 * np.tan(np.deg2rad(75) / 2))
+        fx = 64 / (2 * (128 / 96) * np.tan(np.deg2rad(75) / 2))
+        u, v = (xx - 31.5) / fx, (yy - 15.5) / fy
+        flow = np.stack((-fx * .5 * .1 * (1 + u*u), -fy * .5 * .1 * u*v), axis=-1)
+        with patch('fly_brain_rc.perception.motion.cv2.calcOpticalFlowFarneback', return_value=flow):
+            obs = estimator.update(replace(frame, yaw_rate=.5), .1)
+        self.assertAlmostEqual(obs.looming, 0, places=5)
+
     def test_red_ball_detector_emits_backend_neutral_observation(self):
         obs = MockRedBallDetector().detect(red_frame(), "red_ball")
         self.assertIsInstance(obs, ObjectObservation)

@@ -17,8 +17,8 @@ def training_evaluator(steps):
         successes = collisions = acquired = 0
         completion = energy = reverse = variation = 0.0
         for identifier in identifiers:
-            _, seed, index = identifier.split('-')
-            case = training_cases(int(seed), int(index) + 1)[int(index)]
+            kind, seed, index = identifier.split('-')
+            case = training_cases(int(seed), int(index) + 1, occluded=kind == 'trainb')[int(index)]
             env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario)
             try:
                 def consume(record):

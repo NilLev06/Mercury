@@ -113,8 +113,6 @@ def run_episode(runtime, steps=1000, *, arrival=None, on_tick=None):
             acquisition = now
         distance = env.goal_distance()
         minimum = min(minimum, distance)
-        if distance < env.sim_cfg.goal_radius and reached is None:
-            reached = now + runtime.dt
         reverse += max(0.0, -record.sensor.encoder_delta)
         if previous_steering is not None:
             variation += abs(record.command.steering - previous_steering)
@@ -124,9 +122,12 @@ def run_episode(runtime, steps=1000, *, arrival=None, on_tick=None):
         stable = tracker.update(record.target, record.command,
                                 record.sensor.encoder_delta / runtime.dt,
                                 record.sensor.tof, runtime.dt)
+        safe_geometry = env.goal_surface_clearance() >= tracker.safe_tof
+        if tracker.elapsed > 0 and safe_geometry and reached is None:
+            reached = now
         if on_tick is not None:
             on_tick(record)
-        if stable:
+        if stable and safe_geometry:
             stopped = now
             break
     success = stopped is not None and reached is not None and env.collisions == 0 and env.penetrations == 0

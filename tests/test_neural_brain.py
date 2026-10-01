@@ -63,7 +63,7 @@ class NeuralBrainTests(unittest.TestCase):
         self.assertEqual(brain.step(*inputs(), 0, 0.02), NeuralFlyBrain().step(*inputs(), 0, 0.02))
 
     def test_simultaneous_first_step_does_not_reuse_new_threat(self):
-        _, telemetry = NeuralFlyBrain().step(*inputs(looming=1.0, area=0.0), 0, 0.02)
+        _, telemetry = NeuralFlyBrain().step(*inputs(contact=True, area=0.0), 0, 0.02)
         # Both drives equal 8 with zero previous threat. Sequential reuse
         # would add newly computed threat to reverse and break equality.
         self.assertAlmostEqual(telemetry.threat, telemetry.motor_reverse, places=14)
@@ -99,9 +99,17 @@ class NeuralBrainTests(unittest.TestCase):
         self.assertGreater(moving_telemetry.populations['exploration'], still_telemetry.populations['exploration'])
         self.assertGreater(moving_command.traction, still_command.traction)
 
+    def test_familiar_view_still_turns_to_sample_unvisited_headings(self):
+        brain = NeuralFlyBrain()
+        sensor, _, motion = inputs()
+        for _ in range(100):
+            command, _ = brain.step(sensor, None, motion, 1, .02)
+        self.assertGreater(command.traction, .10)
+        self.assertGreater(command.steering, .05)
+
     def test_sensory_gain_changes_motor_response(self):
-        low = NeuralFlyBrain(FlyGenome(sensory_gain=0.1))
-        high = NeuralFlyBrain(FlyGenome(sensory_gain=12.0))
+        low = NeuralFlyBrain(FlyGenome(sensory_gain=0.1, target_gain=5))
+        high = NeuralFlyBrain(FlyGenome(sensory_gain=12.0, target_gain=5))
         for _ in range(100):
             low_command, _ = low.step(*inputs(bearing=0.7), 0, 0.02)
             high_command, _ = high.step(*inputs(bearing=0.7), 0, 0.02)

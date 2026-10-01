@@ -11,19 +11,23 @@ import numpy as np
 class FlyGenome:
     tau: float = 0.12
     sensory_gain: float = 6.0
-    target_gain: float = 5.0
+    target_gain: float = 12.0
     threat_gain: float = 12.0
-    exploration_gain: float = 2.0
+    exploration_gain: float = 6.0
+    exploration_turn_gain: float = 15.0
+    looming_gain: float = 0.2
     memory_decay: float = 0.8
     habituation_rate: float = 0.5
     visit_decay: float = 0.03
     proximity_distance: float = 0.35
     arrival_area: float = 0.15
-    VERSION = 1
+    VERSION = 2
     BOUNDS = MappingProxyType({
         'tau': (0.02, 2.0), 'sensory_gain': (0.1, 12.0),
         'target_gain': (0.1, 12.0), 'threat_gain': (6.0, 20.0),
         'exploration_gain': (0.1, 6.0), 'memory_decay': (0.01, 5.0),
+        'exploration_turn_gain': (1.0, 30.0),
+        'looming_gain': (0.05, 1.0),
         'habituation_rate': (0.01, 3.0), 'visit_decay': (0.001, 1.0),
         'proximity_distance': (0.1, 1.0), 'arrival_area': (0.05, 0.3),
     })

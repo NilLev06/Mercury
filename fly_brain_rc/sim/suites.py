@@ -12,7 +12,7 @@ class SuiteCase:
     scenario: Scenario
 
 
-def training_cases(seed, count):
+def training_cases(seed, count, *, occluded=False):
     if type(count) is not int or count < 0:
         raise ValueError('count must be nonnegative')
     rng = random.Random(seed)
@@ -20,8 +20,14 @@ def training_cases(seed, count):
     for index in range(count):
         angle = rng.uniform(-math.pi, math.pi)
         radius = rng.uniform(1.8, 2.6)
-        name = f'train-{seed}-{index:03d}'
-        result.append(SuiteCase(name, seed + index, Scenario(name, (), (radius * math.cos(angle), radius * math.sin(angle)))))
+        name = f'{"trainb" if occluded else "train"}-{seed}-{index:03d}'
+        obstacles = ()
+        if occluded:
+            along = rng.uniform(.9, 1.3)
+            lateral = rng.choice((-1, 1)) * rng.uniform(.25, .45)
+            obstacles = (((along * math.cos(angle) - lateral * math.sin(angle),
+                           along * math.sin(angle) + lateral * math.cos(angle)), BLUE),)
+        result.append(SuiteCase(name, seed + index, Scenario(name, obstacles, (radius * math.cos(angle), radius * math.sin(angle)))))
     return tuple(result)
 
 

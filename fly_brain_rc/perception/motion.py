@@ -46,6 +46,17 @@ class MotionEstimator:
         optic_rotation = float(np.clip(fx.mean() / normalizer, -1.0, 1.0))
 
         yy, xx = np.indices((height, width), dtype=np.float32)
+        # Camera yaw produces spatially varying flow even for static walls.
+        # Remove its pinhole projection before estimating radial expansion;
+        # translation and genuine approach remain in the residual.
+        aspect = frame.gray.shape[1] / frame.gray.shape[0]
+        focal_y = height / (2 * np.tan(np.deg2rad(75.0) / 2))
+        focal_x = width / (2 * aspect * np.tan(np.deg2rad(75.0) / 2))
+        u = (xx - (width - 1) / 2) / focal_x
+        v = (yy - (height - 1) / 2) / focal_y
+        fx = fx + focal_x * frame.yaw_rate * dt * (1 + u * u)
+        fy = fy + focal_y * frame.yaw_rate * dt * u * v
+        magnitude = np.hypot(fx, fy)
         motion_weight = float(magnitude.sum())
         if motion_weight > 1e-6:
             center_x = float((xx * magnitude).sum() / motion_weight)

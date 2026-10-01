@@ -60,7 +60,8 @@ class NeuralFlyBrain:
         area = target.apparent_area if target is not None else 0.0
         size = min(1.0, area / g.arrival_area)
         proximity = float(np.clip(1 - sensor.tof / g.proximity_distance, 0, 1))
-        threat_input = max(float(np.clip(motion.looming, 0, 1)), proximity, float(sensor.contact))
+        looming = g.looming_gain * float(np.clip(motion.looming, 0, 1))
+        threat_input = max(looming, proximity, float(sensor.contact))
         sensory_threat = max(old['looming'], old['proximity'], old['contact'])
         displacement = math.tanh(math.hypot(*self.compass.home_vector))
         return_familiarity = (1 - displacement) * old['habituation']
@@ -71,7 +72,7 @@ class NeuralFlyBrain:
         for name, value in (('target_left', left), ('target_center', center), ('target_right', right),
                             ('target_size', size), ('flow_left', abs(motion.flow_left)),
                             ('flow_center', abs(motion.flow_center)), ('flow_right', abs(motion.flow_right)),
-                            ('looming', motion.looming), ('proximity', proximity), ('contact', float(sensor.contact)),
+                            ('looming', looming), ('proximity', proximity), ('contact', float(sensor.contact)),
                             ('familiarity', familiarity)):
             drive[name] += g.sensory_gain * float(np.clip(value, 0, 1))
         drive['habituation'] += 6 * familiarity + old['familiarity'] + 2 * old['habituation']
@@ -82,7 +83,7 @@ class NeuralFlyBrain:
         avoidance = math.tanh(motion.flow_left - motion.flow_right + 0.15)
         exploration = old['exploration'] * (1 - confidence)
         steering_drive = g.target_gain * (right - left + memory_right - memory_left +
-                                          0.5 * (old['target_right'] - old['target_left'])) + exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
+                                          0.5 * (old['target_right'] - old['target_left'])) + g.exploration_turn_gain * exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
         drive['motor_right'] = -2 + steering_drive - 2 * old['motor_left']
         drive['motor_left'] = -2 - steering_drive - 2 * old['motor_right']
         braking = confidence * min(2.0, area / g.arrival_area)

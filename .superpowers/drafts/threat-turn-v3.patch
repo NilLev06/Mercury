@@ -1,0 +1,18 @@
+diff --git a/fly_brain_rc/neural/genome.py b/fly_brain_rc/neural/genome.py
+--- a/fly_brain_rc/neural/genome.py
++++ b/fly_brain_rc/neural/genome.py
+@@ -16,1 +16,2 @@
+     looming_gain: float = 0.2
++    threat_turn_gain: float = 40.0
+@@ -23,1 +24,1 @@
+-    VERSION = 2
++    VERSION = 3
+@@ -28,1 +29,2 @@
+         'looming_gain': (0.05, 1.0),
++        'threat_turn_gain': (1.0, 80.0),
+diff --git a/fly_brain_rc/neural/brain.py b/fly_brain_rc/neural/brain.py
+--- a/fly_brain_rc/neural/brain.py
++++ b/fly_brain_rc/neural/brain.py
+@@ -90,1 +90,1 @@
+-                                          0.5 * (old['target_right'] - old['target_left'])) + g.exploration_turn_gain * exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
++                                          0.5 * (old['target_right'] - old['target_left'])) + g.exploration_turn_gain * exploration * turn + g.threat_turn_gain * (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])

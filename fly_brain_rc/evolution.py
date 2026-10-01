@@ -35,7 +35,7 @@ class EvolutionConfig:
             raise ValueError('scenarios must be unique and nonempty')
         for identifier in self.scenario_ids:
             parts = identifier.split('-') if isinstance(identifier, str) else []
-            if len(parts) != 3 or parts[0] != 'train' or not all(p.isdigit() for p in parts[1:]):
+            if len(parts) != 3 or parts[0] not in ('train', 'trainb') or not all(p.isdigit() for p in parts[1:]):
                 raise ValueError('evolution accepts training cases only')
         object.__setattr__(self, 'scenario_ids', tuple(self.scenario_ids))
 

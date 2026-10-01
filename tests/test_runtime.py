@@ -56,7 +56,7 @@ class RuntimeTests(unittest.TestCase):
         records = iter(RuntimeTelemetry(i * .02, i + 1, frame, target, motion,
                           BrainTelemetry(familiarity=.25), ActuatorCommand(0, .1 * i, i * .02, i + 1))
                        for i in range(3))
-        env = SimpleNamespace(goal_distance=lambda: .2, sim_cfg=SimpleNamespace(goal_radius=.3), collisions=0, penetrations=0)
+        env = SimpleNamespace(goal_distance=lambda: .8, goal_surface_clearance=lambda: .28, collisions=0, penetrations=0)
         runtime = SimpleNamespace(env=env, dt=.02, tick=lambda: next(records))
         result = run_episode(runtime, 3, arrival=ArrivalTracker(duration=.06))
         self.assertTrue(result.success)
@@ -68,8 +68,19 @@ class RuntimeTests(unittest.TestCase):
     def test_distance_alone_is_not_success(self):
         frame = SensorFrame(np.zeros((8, 8, 3)), np.zeros((8, 8)), 0, 0, 1, False, 0)
         record = RuntimeTelemetry(0, 1, frame, None, MotionObservation(0, 0, 0, 0, 0, 0), BrainTelemetry(), ActuatorCommand(0, 0, 0, 1))
-        env = SimpleNamespace(goal_distance=lambda: .1, sim_cfg=SimpleNamespace(goal_radius=.3), collisions=0, penetrations=0)
+        env = SimpleNamespace(goal_distance=lambda: .8, goal_surface_clearance=lambda: .28, collisions=0, penetrations=0)
         result = run_episode(SimpleNamespace(env=env, dt=.02, tick=lambda: record), 2)
+        self.assertFalse(result.success)
+        self.assertIsNone(result.stable_stop_time)
+
+    def test_sensor_arrival_cannot_override_unsafe_surface_clearance(self):
+        from fly_brain_rc.neural.brain import ArrivalTracker
+        frame = SensorFrame(np.zeros((8, 8, 3)), np.zeros((8, 8)), 0, 0, 1, False, 0)
+        target = ObjectObservation('red_ball', 1, (0, 0, 1, 1), 0, .15, 0)
+        record = RuntimeTelemetry(0, 1, frame, target, MotionObservation(0, 0, 0, 0, 0, 0), BrainTelemetry(), ActuatorCommand(0, 0, 0, 1))
+        env = SimpleNamespace(goal_distance=lambda: .6, goal_surface_clearance=lambda: .08, collisions=0, penetrations=0)
+        result = run_episode(SimpleNamespace(env=env, dt=.02, tick=lambda: record), 1,
+                             arrival=ArrivalTracker(duration=.02))
         self.assertFalse(result.success)
         self.assertIsNone(result.stable_stop_time)
 
@@ -79,6 +90,6 @@ class RuntimeTests(unittest.TestCase):
         target = ObjectObservation('red_ball', 1, (0, 0, 1, 1), 0, .15, 0)
         record = RuntimeTelemetry(0, 1, frame, target, MotionObservation(0, 0, 0, 0, 0, 0), BrainTelemetry(), ActuatorCommand(0, 0, 0, 1))
         for collisions, penetrations in ((1, 0), (0, 1)):
-            env = SimpleNamespace(goal_distance=lambda: .1, sim_cfg=SimpleNamespace(goal_radius=.3), collisions=collisions, penetrations=penetrations)
+            env = SimpleNamespace(goal_distance=lambda: .8, goal_surface_clearance=lambda: .28, collisions=collisions, penetrations=penetrations)
             result = run_episode(SimpleNamespace(env=env, dt=.02, tick=lambda: record), 1, arrival=ArrivalTracker(duration=.02))
             self.assertFalse(result.success)

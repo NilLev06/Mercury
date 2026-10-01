@@ -175,6 +175,16 @@ class FlyCarEnv:
         gx, gy = self.goal
         return math.hypot(gx - x, gy - y)
 
+    def goal_surface_clearance(self) -> float:
+        """Conservative car-envelope to target-sphere gap, evaluator only.
+
+        The bicycle pose is at the rear axle, not at the nose. The car's
+        collision envelope has radius ``collision_radius`` and the rendered
+        target sphere has radius 0.22 m. Safe arrival is a stand-off from these
+        surfaces; the image area band supplies the upper proximity bound.
+        """
+        return self.goal_distance() - self.drive.collision_radius - 0.22
+
     def _encoder_position(self) -> float:
         rear_wheel_angle = (float(self.d.qpos[self.jq_wl]) + float(self.d.qpos[self.jq_wr])) / 2.0
         return rear_wheel_angle * self.drive.wheel_radius

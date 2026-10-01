@@ -1,0 +1,9 @@
+{
+  "generation": 2,
+  "seed": 42,
+  "parameter_version": 2,
+  "training_ids": ["train-0-000", "train-0-001", "train-0-002", "train-0-003", "train-0-004", "train-0-005"],
+  "best": {"successes": 6, "collisions": 0, "acquisition": 1.0, "completion_time": 74.2, "energy": 44.77707927229175, "reverse_distance": 0.017974333352300365, "steering_variation": 11.635133816742867},
+  "held_out": {"type_a": {"successes": 10, "episodes": 10, "collisions": 0, "penetrations": 0}, "type_b": {"successes": 0, "episodes": 10, "collisions": 3860, "penetrations": 0}},
+  "acceptance_complete": false
+}
