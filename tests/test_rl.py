@@ -20,8 +20,7 @@ class ReinforcementLearningTests(unittest.TestCase):
         self.assertLess(repeated_idle, first_idle)
 
     def test_stall_penalty_is_capped_and_contact_is_only_charged_on_impact(self):
-        reward = ExplorationReward(idle_penalty=.01, max_idle_penalty=.12, contact_penalty=1.5,
-                                   max_stall_steps=3)
+        reward = ExplorationReward(idle_penalty=.01, max_idle_penalty=.12, contact_penalty=1.5)
         reward.reset((0.0, 0.0))
 
         tail = [reward.step((0.0, 0.0), moved=False, contact=False, reached=False) for _ in range(200)]
@@ -31,10 +30,6 @@ class ReinforcementLearningTests(unittest.TestCase):
         self.assertGreaterEqual(min(tail), -.12)
         self.assertAlmostEqual(impact, -1.5)
         self.assertEqual(held_contact, 0.0)
-        reward.reset((0.0, 0.0))
-        for _ in range(3):
-            reward.step((0.0, 0.0), moved=False, contact=False, reached=False)
-        self.assertTrue(reward.is_trapped)
 
     def test_positive_experience_increases_selected_action_value(self):
         learner = QLearningAgent(actions=((0.6, 0.0),), alpha=0.5, gamma=0.0, epsilon=0.0)

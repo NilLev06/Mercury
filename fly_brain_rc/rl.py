@@ -47,9 +47,9 @@ class ExplorationReward:
     def __init__(self, *, cell_size: float = 0.45, new_cell_reward: float = 1.0,
                  idle_penalty: float = 0.01, max_idle_penalty: float = 0.12,
                  contact_penalty: float = 1.5, escape_reward: float = 0.5,
-                 goal_reward: float = 50.0, max_stall_steps: int = 80):
-        if cell_size <= 0 or max_stall_steps <= 0:
-            raise ValueError("cell_size and max_stall_steps must be positive")
+                 goal_reward: float = 50.0):
+        if cell_size <= 0:
+            raise ValueError("cell_size must be positive")
         self.cell_size = cell_size
         self.new_cell_reward = new_cell_reward
         self.idle_penalty = idle_penalty
@@ -57,7 +57,6 @@ class ExplorationReward:
         self.contact_penalty = contact_penalty
         self.escape_reward = escape_reward
         self.goal_reward = goal_reward
-        self.max_stall_steps = max_stall_steps
         self.reset((0.0, 0.0))
 
     def _cell(self, position: tuple[float, float]) -> tuple[int, int]:
@@ -87,11 +86,6 @@ class ExplorationReward:
         if reached:
             reward += self.goal_reward
         return reward
-
-    @property
-    def is_trapped(self) -> bool:
-        return self.stationary_steps >= self.max_stall_steps
-
 
 @dataclass
 class QLearningAgent:
