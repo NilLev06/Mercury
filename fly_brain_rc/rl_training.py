@@ -5,31 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import DRIVE, SIM
-from .contracts import ActuatorCommand, ObjectObservation, SensorFrame
+from .contracts import ActuatorCommand
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
-from .rl import ExplorationReward, QLearningAgent
+from .rl import ExplorationReward, QLearningAgent, observation_state
 from .sim.env import FlyCarEnv
 from .sim.suites import training_cases
-
-
-def _bearing(label: str, observation: ObjectObservation | None) -> str:
-    if observation is None:
-        return "none"
-    if observation.bearing < -0.18:
-        return f"{label}_left"
-    if observation.bearing > 0.18:
-        return f"{label}_right"
-    return f"{label}_center"
-
-
-def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
-                      obstacle: ObjectObservation | None) -> tuple[str, ...]:
-    """Compact policy state containing only camera and embodied readings."""
-    obstacle_state = "clear" if obstacle is None else _bearing("obstacle", obstacle)
-    distance = "near" if sensor.tof < 0.42 else "far"
-    movement = "moving" if abs(sensor.encoder_delta) >= 0.001 else "stalled"
-    return (_bearing("target", target), obstacle_state, distance, movement)
-
 
 @dataclass(frozen=True)
 class TrainingSummary:

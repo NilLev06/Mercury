@@ -11,11 +11,32 @@ import json
 from pathlib import Path
 import random
 
+from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, SensorFrame
+
 
 DEFAULT_ACTIONS = (
     (0.70, -0.75), (0.70, -0.35), (0.70, 0.0), (0.70, 0.35), (0.70, 0.75),
     (-0.45, -0.65), (-0.45, 0.65),
 )
+
+
+def _bearing(label: str, observation: ObjectObservation | None) -> str:
+    if observation is None:
+        return f"{label}_none"
+    if observation.bearing < -0.18:
+        return f"{label}_left"
+    if observation.bearing > 0.18:
+        return f"{label}_right"
+    return f"{label}_center"
+
+
+def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
+                      obstacle: ObjectObservation | None) -> tuple[str, ...]:
+    """Compact policy state containing only camera and embodied readings."""
+    obstacle_state = "clear" if obstacle is None else _bearing("obstacle", obstacle)
+    distance = "near" if sensor.tof < 0.42 else "far"
+    movement = "moving" if abs(sensor.encoder_delta) >= 0.001 else "stalled"
+    return (_bearing("target", target), obstacle_state, distance, movement)
 
 
 class ExplorationReward:
@@ -112,3 +133,27 @@ class QLearningAgent:
         if any(len(values) != len(agent.actions) for values in agent.table.values()):
             raise ValueError("invalid RL policy table")
         return agent
+
+
+class QLearningBrain:
+    """Frozen trained policy behind the regular runtime brain interface."""
+
+    def __init__(self, agent: QLearningAgent):
+        self.agent = agent
+
+    def step(self, sensor: SensorFrame, target: ObjectObservation | None, motion,
+             familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
+        state = observation_state(sensor, target, obstacle)
+        action = self.agent.choose(state, explore=False)
+        traction, steering = self.agent.actions[action]
+        value = self.agent.value(state, action)
+        command = ActuatorCommand(traction, steering, sensor.timestamp, 0)
+        telemetry = BrainTelemetry(
+            populations={"rl_best_value": value, "rl_known_states": float(len(self.agent.table))},
+            familiarity=familiarity,
+            threat=float(sensor.contact),
+            motor_left=max(0.0, -steering), motor_right=max(0.0, steering),
+            motor_forward=max(0.0, traction), motor_reverse=max(0.0, -traction),
+            traction=traction, steering=steering,
+        )
+        return command, telemetry
