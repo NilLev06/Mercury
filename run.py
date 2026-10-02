@@ -56,23 +56,6 @@ def _run_simulator(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_rl_trainer(args: argparse.Namespace) -> int:
-    """Use MuJoCo's macOS Python trampoline for offscreen camera training."""
-    if sys.platform == "darwin" and "MJPYTHON_BIN" not in os.environ:
-        command = [_mjpython_path(), str(Path(__file__).resolve()), "train-rl",
-                   "--episodes", str(args.episodes), "--steps", str(args.steps),
-                   "--seed", str(args.seed), "--epsilon", str(args.epsilon), "--out", args.out]
-        os.execv(command[0], command)
-
-    from dataclasses import asdict
-    import json
-    from fly_brain_rc.rl_training import train_q_learning
-    result = train_q_learning(episodes=args.episodes, steps=args.steps, output=args.out,
-                              seed=args.seed, epsilon=args.epsilon)
-    print(json.dumps(asdict(result), allow_nan=False))
-    return 0
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Digital Fly Car launcher")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -104,12 +87,6 @@ def main() -> int:
     evolution = subparsers.add_parser('evolve', help='evolve neural parameters on training maps')
     evolution.add_argument('--config', required=True)
     evolution.add_argument('--out', required=True)
-    train_rl = subparsers.add_parser('train-rl', help='train the exploration Q-policy in MuJoCo')
-    train_rl.add_argument('--episodes', type=int, default=120)
-    train_rl.add_argument('--steps', type=int, default=SIM.episode_steps)
-    train_rl.add_argument('--seed', type=int, default=0)
-    train_rl.add_argument('--epsilon', type=float, default=.25)
-    train_rl.add_argument('--out', default='artifacts/rl/q-policy.json')
     args = parser.parse_args()
     if args.command == 'sim' and args.reset_memory and args.memory is None:
         parser.error('--reset-memory requires --memory PATH')
@@ -142,10 +119,6 @@ def main() -> int:
             return 0
         except (ValueError, TypeError, OSError) as exc:
             parser.error(str(exc))
-    if args.command == 'train-rl':
-        if args.episodes <= 0 or args.steps <= 0 or not 0 <= args.epsilon <= 1:
-            parser.error('--episodes and --steps must be positive; --epsilon must be in [0, 1]')
-        return _run_rl_trainer(args)
     if args.command == 'dashboard':
         import webbrowser
         from urllib.parse import urlsplit

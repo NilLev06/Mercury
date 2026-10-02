@@ -1,5 +1,4 @@
 import unittest
-import argparse
 
 from scripts.evaluate import acceptance_passes, episode_seeds, suite_required_rate
 from unittest.mock import patch
@@ -31,25 +30,6 @@ class EvaluationTests(unittest.TestCase):
         command = call.call_args.args[0]
         self.assertEqual(command[command.index('--episodes') + 1], '10')
         self.assertNotIn('--required-rate', command)
-
-    def test_train_rl_dispatches_simulation_trainer(self):
-        with patch('sys.argv', ['run.py', 'train-rl', '--episodes', '2', '--steps', '9', '--out', 'tmp.json']), \
-             patch('run._run_rl_trainer', return_value=0) as train:
-            self.assertEqual(run.main(), 0)
-        args = train.call_args.args[0]
-        self.assertEqual(args.episodes, 2)
-        self.assertEqual(args.steps, 9)
-        self.assertEqual(args.out, 'tmp.json')
-
-    def test_train_rl_uses_mjpython_on_macos_for_camera_rendering(self):
-        args = argparse.Namespace(episodes=2, steps=9, seed=4, epsilon=.2, out='tmp.json')
-        with patch('run.sys.platform', 'darwin'), patch.dict('run.os.environ', {}, clear=True), \
-             patch('run._mjpython_path', return_value='/opt/mjpython'), \
-             patch('run.os.execv', side_effect=SystemExit(0)) as execute:
-            with self.assertRaises(SystemExit):
-                run._run_rl_trainer(args)
-        self.assertEqual(execute.call_args.args[0], '/opt/mjpython')
-        self.assertIn('train-rl', execute.call_args.args[1])
     def test_seed_schedule_is_repeatable_and_contiguous(self):
         self.assertEqual(episode_seeds(4, start=7), [7, 8, 9, 10])
 
