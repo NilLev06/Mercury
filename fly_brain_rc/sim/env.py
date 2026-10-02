@@ -253,12 +253,29 @@ class FlyCarEnv:
             self.penetrations += 1
 
     def _pose_collides(self, state: BicycleState) -> bool:
-        limit = self.sim_cfg.arena_half - self.drive.collision_radius
-        if abs(state.x) > limit or abs(state.y) > limit:
+        # The kinematic state is at the rear-wheel axle.  Model the actual
+        # swept footprint (chassis plus outer wheel edges), not a large round
+        # proxy.  The latter made a 0.26 x 0.404 m car behave as a 0.60 m disk.
+        rear = self.drive.wheel_radius + 0.005
+        front = self.drive.wheelbase + self.drive.wheel_radius + 0.005
+        half_width = self.drive.track / 2 + 0.022
+        cos_yaw, sin_yaw = math.cos(state.yaw), math.sin(state.yaw)
+        corners = (
+            (state.x + cos_yaw * local_x - sin_yaw * local_y,
+             state.y + sin_yaw * local_x + cos_yaw * local_y)
+            for local_x in (-rear, front)
+            for local_y in (-half_width, half_width)
+        )
+        if any(abs(x) > self.sim_cfg.arena_half or abs(y) > self.sim_cfg.arena_half for x, y in corners):
             return True
-        threshold = self.sim_cfg.obstacle_radius + self.drive.collision_radius
         for (ox, oy), _ in self.obstacles:
-            if math.hypot(state.x - ox, state.y - oy) < threshold:
+            # Circle-vs-oriented-rectangle collision in vehicle coordinates.
+            dx, dy = ox - state.x, oy - state.y
+            local_x = cos_yaw * dx + sin_yaw * dy
+            local_y = -sin_yaw * dx + cos_yaw * dy
+            nearest_x = min(front, max(-rear, local_x))
+            nearest_y = min(half_width, max(-half_width, local_y))
+            if math.hypot(local_x - nearest_x, local_y - nearest_y) < self.sim_cfg.obstacle_radius:
                 return True
         return False
 

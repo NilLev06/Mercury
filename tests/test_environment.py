@@ -48,6 +48,16 @@ class EnvironmentGeometryTests(unittest.TestCase):
         self.assertTrue(env._pose_collides(BicycleState(x=2.9, y=0.0)))
         self.assertFalse(env._pose_collides(BicycleState(x=2.7, y=0.0)))
 
+    def test_side_clearance_uses_the_real_car_width_not_a_round_disk(self):
+        env = self.make_env()
+        env.drive.collision_radius = 0.30
+        env.obstacles = [((0.0, 0.51), (1.0, 0.0, 0.0))]
+
+        # The outer wheel edge is 0.202 m from the centreline.  A 0.28 m
+        # cylinder at y=0.51 therefore has 0.308 m of true lateral clearance.
+        # A former 0.30 m circular proxy incorrectly declared this a collision.
+        self.assertFalse(env._pose_collides(BicycleState(x=0.0, y=0.0, yaw=0.0)))
+
     def test_swept_motion_cannot_tunnel_through_obstacle(self):
         env = self.make_env()
         before = BicycleState(x=0.0, y=0.0)
