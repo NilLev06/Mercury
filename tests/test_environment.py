@@ -53,7 +53,7 @@ class EnvironmentGeometryTests(unittest.TestCase):
         before = BicycleState(x=0.0, y=0.0)
         after = BicycleState(x=2.0, y=0.0)
         self.assertFalse(env._pose_collides(after))
-        self.assertTrue(env._motion_collides(before, after))
+        self.assertTrue(env._motion_collides(before, after)[0])
 
     def test_contact_count_only_changes_on_contact_edge(self):
         env = self.make_env()
@@ -121,6 +121,17 @@ class EnvironmentIntegrationTests(unittest.TestCase):
         self.assertTrue(self.env._contact_active)
         self.assertAlmostEqual(self.env.state.x, 0.0)
         self.assertGreater(self.env.state.yaw, 0.0)
+
+    def test_blocked_steering_drive_slides_along_the_obstacle(self):
+        self.env.obstacles = [((0.6, 0.0), (0.2, 0.5, 0.8))]
+        self.env.drive.max_speed = 5.0
+        self.env.drive.linear_accel = 100.0
+
+        self.env.step_kinematic(1.0, 1.0, 0.1)
+
+        self.assertTrue(self.env._contact_active)
+        self.assertGreater(self.env.state.y, 0.0)
+        self.assertFalse(self.env._pose_collides(self.env.state))
 
     def test_rendered_sensor_frame_has_only_embodied_readings(self):
         with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
