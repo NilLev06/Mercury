@@ -11,6 +11,12 @@ import run
 
 
 class MemoryCliTests(unittest.TestCase):
+    def test_double_click_launcher_offers_every_interactive_map(self):
+        launcher = (Path(__file__).resolve().parents[1] / 'Digital Fly Car.command').read_text()
+        self.assertIn('choose from list', launcher)
+        for scenario in ('corridor', 'turn_corridor', 'slalom', 'blocked_goal', 'random'):
+            self.assertIn(scenario, launcher)
+
     def test_plain_launcher_defaults_to_ephemeral_memory(self):
         with patch('sys.argv', ['run.py', 'sim']), patch('run._run_simulator', return_value=0) as launch:
             self.assertEqual(run.main(), 0)
