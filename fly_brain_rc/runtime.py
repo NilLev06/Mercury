@@ -57,8 +57,6 @@ class FlyRuntime:
             self.motion = MotionEstimator()
             if isinstance(self.brain, NeuralFlyBrain):
                 self.brain = NeuralFlyBrain(self.brain.genome)
-            elif hasattr(self.brain, 'reset'):
-                self.brain.reset()
         sensor = self.env.sensor_frame()
         target = self.detector.detect(sensor, self.target)
         obstacle = self.obstacle_detector.detect(sensor, 'obstacle')

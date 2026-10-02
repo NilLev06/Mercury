@@ -15,12 +15,9 @@ from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, Senso
 
 
 DEFAULT_ACTIONS = (
-    (0.0, 0.0),
-    (0.35, -0.35), (0.35, 0.0), (0.35, 0.35),
-    (0.70, -0.75), (0.70, 0.0), (0.70, 0.75),
+    (0.70, -0.75), (0.70, -0.35), (0.70, 0.0), (0.70, 0.35), (0.70, 0.75),
     (-0.70, -0.80), (-0.70, 0.0), (-0.70, 0.80),
 )
-ACTION_HOLD_STEPS = 10
 
 
 def _bearing(label: str, observation: ObjectObservation | None) -> str:
@@ -41,17 +38,7 @@ def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
     movement = "moving" if abs(sensor.encoder_delta) >= 0.001 else "stalled"
     contact = ("contact_left" if sensor.contact_left else "contact_right" if sensor.contact_right
                else "contact_center" if sensor.contact else "no_contact")
-    if target is None:
-        target_size = "target_none"
-    elif target.apparent_area < 0.06:
-        target_size = "target_small"
-    elif target.apparent_area < 0.10:
-        target_size = "target_approach"
-    elif target.apparent_area <= 0.22:
-        target_size = "target_arrival"
-    else:
-        target_size = "target_too_close"
-    return (_bearing("target", target), target_size, obstacle_state, distance, movement, contact)
+    return (_bearing("target", target), obstacle_state, distance, movement, contact)
 
 
 class ExplorationReward:
@@ -60,8 +47,7 @@ class ExplorationReward:
     def __init__(self, *, cell_size: float = 0.45, new_cell_reward: float = 1.0,
                  idle_penalty: float = 0.01, max_idle_penalty: float = 0.12,
                  contact_penalty: float = 1.5, escape_reward: float = 0.5,
-                 goal_reward: float = 50.0, switch_penalty: float = 0.015,
-                 max_stall_steps: int = 80):
+                 goal_reward: float = 50.0, max_stall_steps: int = 80):
         if cell_size <= 0 or max_stall_steps <= 0:
             raise ValueError("cell_size and max_stall_steps must be positive")
         self.cell_size = cell_size
@@ -71,7 +57,6 @@ class ExplorationReward:
         self.contact_penalty = contact_penalty
         self.escape_reward = escape_reward
         self.goal_reward = goal_reward
-        self.switch_penalty = switch_penalty
         self.max_stall_steps = max_stall_steps
         self.reset((0.0, 0.0))
 
@@ -83,8 +68,7 @@ class ExplorationReward:
         self.stationary_steps = 0
         self._contact_active = False
 
-    def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool,
-             action_changed: bool = False) -> float:
+    def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool) -> float:
         reward = 0.0
         cell = self._cell(position)
         if cell not in self.visited:
@@ -100,8 +84,6 @@ class ExplorationReward:
         if contact and not self._contact_active:
             reward -= self.contact_penalty
         self._contact_active = contact
-        if action_changed:
-            reward -= self.switch_penalty
         if reached:
             reward += self.goal_reward
         return reward
@@ -148,7 +130,7 @@ class QLearningAgent:
 
     def save(self, path: str | Path) -> None:
         payload = {
-            "version": 3, "actions": self.actions, "alpha": self.alpha,
+            "version": 2, "actions": self.actions, "alpha": self.alpha,
             "gamma": self.gamma, "epsilon": self.epsilon,
             "table": {"|".join(state): values for state, values in self.table.items()},
         }
@@ -157,7 +139,7 @@ class QLearningAgent:
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
-        if payload.get("version") != 3:
+        if payload.get("version") != 2:
             raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
                     alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon)
@@ -172,20 +154,11 @@ class QLearningBrain:
 
     def __init__(self, agent: QLearningAgent):
         self.agent = agent
-        self.reset()
-
-    def reset(self):
-        self._action = None
-        self._remaining = 0
 
     def step(self, sensor: SensorFrame, target: ObjectObservation | None, motion,
              familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
         state = observation_state(sensor, target, obstacle)
-        if self._remaining <= 0 or self._action is None:
-            self._action = self.agent.choose(state, explore=False)
-            self._remaining = ACTION_HOLD_STEPS
-        action = self._action
-        self._remaining -= 1
+        action = self.agent.choose(state, explore=False)
         traction, steering = self.agent.actions[action]
         value = self.agent.value(state, action)
         command = ActuatorCommand(traction, steering, sensor.timestamp, 0)
