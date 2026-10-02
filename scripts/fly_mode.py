@@ -8,6 +8,7 @@ from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.sim.scenarios import get_scenario, scenario_names
 from fly_brain_rc.sim.kinematics import BicycleState
 from fly_brain_rc.neural.brain import NeuralFlyBrain
+from fly_brain_rc.rl import QLearningAgent, QLearningBrain
 from fly_brain_rc.runtime import FlyRuntime, load_genome, run_episode
 from scripts.memory_store import open_memory, save_memory
 
@@ -28,12 +29,14 @@ def main():
     parser.add_argument('--dashboard', action='store_true')
     parser.add_argument('--memory', metavar='PATH')
     parser.add_argument('--reset-memory', action='store_true')
+    parser.add_argument('--rl-policy', metavar='PATH')
     args = parser.parse_args()
     try:
         memory = open_memory(args.memory, reset=args.reset_memory)
     except ValueError as exc:
         parser.error(str(exc))
     genome = load_genome(args.genome)
+    brain = QLearningBrain(QLearningAgent.load(args.rl_policy)) if args.rl_policy else NeuralFlyBrain(genome)
     env = FlyCarEnv(SIM, DRIVE, seed=args.seed,
                     scenario=get_scenario(args.scenario) if args.scenario else None)
     dashboard = None
@@ -59,7 +62,7 @@ def main():
                     env.d.qpos[:] = 0
                     env._sync_kinematic()
                     env._last_encoder_position = env._encoder_position()
-                runtime = FlyRuntime(env, NeuralFlyBrain(genome), target=args.target,
+                runtime = FlyRuntime(env, brain, target=args.target,
                                      memory=memory,
                                      emit=bus.publish if dashboard else None,
                                      mission=mission if dashboard else None)
