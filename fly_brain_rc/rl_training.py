@@ -51,10 +51,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
                                            contact=next_sensor.contact, reached=reached)
-                trapped = reward_model.is_trapped
-                if trapped:
-                    reward -= 3.0
-                agent.update(state, action, reward, next_state, terminal=reached or trapped)
+                agent.update(state, action, reward, next_state, terminal=reached)
                 total += reward
                 if emit is not None:
                     telemetry = BrainTelemetry(
@@ -75,8 +72,6 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                     progress(index + 1, episodes, total, len(reward_model.visited))
                 if reached:
                     successes += 1
-                    break
-                if trapped:
                     break
         finally:
             if env.renderer is not None:
