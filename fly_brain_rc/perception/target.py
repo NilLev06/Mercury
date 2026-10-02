@@ -81,7 +81,9 @@ class MockBlueObstacleDetector:
             return None
         rgb = np.ascontiguousarray(frame.rgb[..., :3], dtype=np.uint8)
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-        mask = cv2.inRange(hsv, (95, 80, 60), (125, 255, 255))
+        # Simulator obstacles alternate blue and teal; both are one obstacle
+        # class for the brain and later map to a real detector label.
+        mask = cv2.inRange(hsv, (80, 80, 60), (125, 255, 255))
         kernel = np.ones((3, 3), dtype=np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)

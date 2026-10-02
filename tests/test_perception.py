@@ -43,6 +43,11 @@ class PerceptionTests(unittest.TestCase):
         self.assertGreater(observation.bearing, 0.0)
         self.assertGreater(observation.apparent_area, 0.0)
 
+    def test_obstacle_detector_recognizes_teal_simulator_cylinder(self):
+        rgb = np.zeros((96, 128, 3), dtype=np.uint8)
+        cv2.circle(rgb, (64, 48), 18, (56, 184, 184), -1)
+        self.assertIsNotNone(MockBlueObstacleDetector().detect(make_frame(rgb), "obstacle"))
+
     def test_perspective_yaw_flow_is_removed_before_looming(self):
         from dataclasses import replace
         from unittest.mock import patch
