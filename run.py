@@ -30,8 +30,6 @@ def _run_simulator(args: argparse.Namespace) -> int:
         command += ["--target", args.target]
         if args.genome:
             command += ["--genome", args.genome]
-        if args.rl_policy:
-            command += ["--rl-policy", args.rl_policy]
         if args.dashboard:
             command += ['--dashboard']
         if args.memory is not None:
@@ -46,8 +44,6 @@ def _run_simulator(args: argparse.Namespace) -> int:
     sys.argv += ["--target", args.target]
     if args.genome:
         sys.argv += ["--genome", args.genome]
-    if args.rl_policy:
-        sys.argv += ["--rl-policy", args.rl_policy]
     if args.scenario:
         sys.argv += ["--scenario", args.scenario]
     if args.dashboard:
@@ -88,7 +84,6 @@ def main() -> int:
     sim.add_argument('--dashboard', action='store_true')
     sim.add_argument('--memory', metavar='PATH', help='opt in to persistent visual familiarity')
     sim.add_argument('--reset-memory', action='store_true', help='back up stored familiarity and start fresh')
-    sim.add_argument('--rl-policy', metavar='PATH', help='run a saved Q-learning policy instead of the reflex brain')
     dashboard = subparsers.add_parser('dashboard', help='open a running simulation dashboard')
     dashboard.add_argument('--attach', default='127.0.0.1:8765', metavar='HOST:PORT')
 
