@@ -59,7 +59,8 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 reached = env.goal_distance() <= env.sim_cfg.goal_radius
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
-                                           contact=next_sensor.contact, reached=reached)
+                                           contact=next_sensor.contact, reached=reached,
+                                           target=next_target)
                 agent.update(state, action, reward, next_state, terminal=reached)
                 total += reward
                 if emit is not None:

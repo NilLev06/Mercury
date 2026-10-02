@@ -66,8 +66,10 @@ class ExplorationReward:
         self.visited = {self._cell(position)}
         self.stationary_steps = 0
         self._contact_active = False
+        self._target_potential = None
 
-    def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool) -> float:
+    def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool,
+             target: ObjectObservation | None = None) -> float:
         reward = 0.0
         cell = self._cell(position)
         if cell not in self.visited:
@@ -83,6 +85,18 @@ class ExplorationReward:
         if contact and not self._contact_active:
             reward -= self.contact_penalty
         self._contact_active = contact
+        if target is None:
+            self._target_potential = None
+        else:
+            # A dense visual shaping signal: keep the target in view, bring it
+            # toward the optical centre, and make it grow in the image.
+            reward += 0.002
+            if abs(target.bearing) <= 0.18:
+                reward += 0.004
+            potential = 4.0 * target.apparent_area - 0.15 * abs(target.bearing)
+            if self._target_potential is not None:
+                reward += max(-0.10, min(0.10, 2.0 * (potential - self._target_potential)))
+            self._target_potential = potential
         if reached:
             reward += self.goal_reward
         return reward

@@ -22,6 +22,16 @@ class ReinforcementLearningTests(unittest.TestCase):
         self.assertLess(first_idle, 0.0)
         self.assertLess(repeated_idle, first_idle)
 
+    def test_centered_target_gives_more_immediate_motivation_than_no_target(self):
+        reward = ExplorationReward()
+        reward.reset((0.0, 0.0))
+        centered = ObjectObservation("red_ball", 1.0, (.4, .4, .6, .6), 0.0, .05, 0.0)
+
+        no_target = reward.step((0.0, 0.0), moved=True, contact=False, reached=False, target=None)
+        target_reward = reward.step((0.0, 0.0), moved=True, contact=False, reached=False, target=centered)
+
+        self.assertGreater(target_reward, no_target)
+
     def test_stall_penalty_is_capped_and_contact_is_only_charged_on_impact(self):
         reward = ExplorationReward(idle_penalty=.01, max_idle_penalty=.12, contact_penalty=1.5)
         reward.reset((0.0, 0.0))
