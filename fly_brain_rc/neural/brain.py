@@ -76,7 +76,10 @@ class NeuralFlyBrain:
         size = min(1.0, area / g.arrival_area)
         proximity = float(np.clip(1 - sensor.tof / g.proximity_distance, 0, 1))
         looming = g.looming_gain * float(np.clip(motion.looming, 0, 1))
-        threat_input = max(looming, proximity, float(sensor.contact), obstacle_size)
+        # Seeing an obstacle is a navigation cue: steer around it and ease
+        # off the throttle. Actual retreat is reserved for a close range,
+        # optical expansion, or a physical contact.
+        threat_input = max(looming, proximity, float(sensor.contact))
         sensory_threat = max(old['looming'], old['proximity'], old['contact'])
         displacement = math.tanh(math.hypot(*self.compass.home_vector))
         return_familiarity = (1 - displacement) * old['habituation']
@@ -101,13 +104,15 @@ class NeuralFlyBrain:
         exploration = old['exploration'] * (1 - confidence)
         steering_drive = g.target_gain * (right - left + memory_right - memory_left +
                                           0.5 * (old['target_right'] - old['target_left'])) + g.exploration_turn_gain * exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
-        steering_drive -= g.threat_gain * (obstacle_right - obstacle_left +
-                                            0.5 * (old['obstacle_right'] - old['obstacle_left']))
+        obstacle_turn = (obstacle_right - obstacle_left
+                         + .75 * obstacle_center * turn
+                         + .5 * (old['obstacle_right'] - old['obstacle_left']))
+        steering_drive -= g.threat_gain * obstacle_turn
         drive['motor_right'] = -2 + steering_drive - 2 * old['motor_left']
         drive['motor_left'] = -2 - steering_drive - 2 * old['motor_right']
         braking = confidence * min(2.0, area / g.arrival_area)
         sensory_approach = old['target_center'] - old['target_size']
-        drive['motor_forward'] = -2 + 4 * confidence + sensory_approach + g.exploration_gain * exploration - 4 * braking - g.threat_gain * threat_input - 2 * (old['threat'] + sensory_threat) - old['flow_center']
+        drive['motor_forward'] = -2 + 4 * confidence + sensory_approach + g.exploration_gain * exploration - 4 * braking - 2 * obstacle_size - g.threat_gain * threat_input - 2 * (old['threat'] + sensory_threat) - old['flow_center']
         drive['motor_reverse'] = -4 + 2 * braking + g.threat_gain * threat_input + 2 * (old['threat'] + sensory_threat)
         tau = np.full(len(self.POPULATIONS), g.tau)
         tau[self.POPULATIONS.index('habituation')] = 1 / g.habituation_rate
