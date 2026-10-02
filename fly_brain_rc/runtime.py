@@ -71,6 +71,7 @@ class FlyRuntime:
                     self._acquisition_time = sensor.timestamp
                 arrived = self.arrival.update(target, command, sensor.encoder_delta / self.dt, sensor.tof, self.dt)
                 self.mission.arrival_elapsed = self.arrival.elapsed
+                self.mission.arrival_reason = self.arrival.last_reason
                 self.mission.acquisition_time = self._acquisition_time
                 if arrived:
                     self.mission.status = 'finished'

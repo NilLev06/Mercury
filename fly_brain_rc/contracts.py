@@ -15,6 +15,8 @@ class SensorFrame:
     tof: float
     contact: bool
     timestamp: float
+    contact_left: bool = False
+    contact_right: bool = False
 
 
 @dataclass(frozen=True)

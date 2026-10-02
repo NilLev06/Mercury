@@ -17,7 +17,7 @@ const el=id=>document.getElementById(id), camera=el('camera').getContext('2d'), 
 async function command(path,body){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const state=await r.json();if(!r.ok)throw Error(state.error);mission(state)}catch(e){el('mission').textContent=e.message}}
 el('start').onclick=()=>command('/api/mission/start',{target_class:el('target').value});
 el('stop').onclick=()=>command('/api/mission/stop',{});
-function mission(m){el('mission').textContent=`Mission: ${m.status} | Acquisition: ${m.acquisition_time??'—'} s | Stable stop: ${(m.arrival_elapsed||0).toFixed(2)} / 3.00 s | Result: ${m.result?JSON.stringify(m.result):'pending'}`}
+function mission(m){el('mission').textContent=`Mission: ${m.status} | Acquisition: ${m.acquisition_time??'—'} s | Stable stop: ${(m.arrival_elapsed||0).toFixed(2)} / 3.00 s (${m.arrival_reason||'waiting'}) | Result: ${m.result?JSON.stringify(m.result):'pending'}`}
 fetch('/api/state').then(r=>r.json()).then(mission);
 const events=new EventSource('/api/telemetry');events.onopen=()=>el('connection').textContent='connected';events.onerror=()=>el('connection').textContent='reconnecting';
 events.onmessage=e=>{const d=JSON.parse(e.data);mission(d.mission);const b=d.brain,s=d.sensor,t=d.target;

@@ -14,13 +14,14 @@ class MissionController:
         self.generation = 0
         self.result = None
         self.arrival_elapsed = 0.0
+        self.arrival_reason = 'waiting_for_target'
         self.acquisition_time = None
 
     def state(self):
         with self.lock:
             return dict(status=self.status, target_class=self.target_class,
                         generation=self.generation, result=self.result,
-                        arrival_elapsed=self.arrival_elapsed, acquisition_time=self.acquisition_time)
+                        arrival_elapsed=self.arrival_elapsed, arrival_reason=self.arrival_reason, acquisition_time=self.acquisition_time)
 
     def start(self, target_class):
         if target_class != 'red_ball':
@@ -31,6 +32,7 @@ class MissionController:
             self.generation += 1
             self.result = None
             self.arrival_elapsed = 0.0
+            self.arrival_reason = 'waiting_for_target'
             self.acquisition_time = None
         return self.state()
 

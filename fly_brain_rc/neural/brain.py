@@ -108,6 +108,7 @@ class NeuralFlyBrain:
                          + .75 * obstacle_center * turn
                          + .5 * (old['obstacle_right'] - old['obstacle_left']))
         steering_drive -= g.threat_gain * obstacle_turn
+        steering_drive -= g.threat_gain * (float(sensor.contact_left) - float(sensor.contact_right))
         drive['motor_right'] = -2 + steering_drive - 2 * old['motor_left']
         drive['motor_left'] = -2 - steering_drive - 2 * old['motor_right']
         braking = confidence * min(2.0, area / g.arrival_area)
@@ -154,6 +155,7 @@ class ArrivalTracker:
 
     def reset(self):
         self.elapsed = 0.0
+        self.last_reason = 'waiting_for_target'
 
     @property
     def arrived(self):
@@ -169,5 +171,17 @@ class ArrivalTracker:
                   and self.area_min <= target.apparent_area <= self.area_max
                   and abs(command.traction) <= self.traction_threshold
                   and abs(speed) <= self.speed_threshold and tof >= self.safe_tof)
-        self.elapsed = min(self.duration, self.elapsed + dt) if stable else 0.0
+        if stable:
+            self.elapsed = min(self.duration, self.elapsed + dt)
+            self.last_reason = 'stable'
+        else:
+            # Once settling has begun, tolerate one-frame visual/odometry
+            # jitter instead of discarding an otherwise steady stop.
+            relaxed = (target is not None and target.confidence > 0
+                       and abs(target.bearing) <= self.bearing_threshold * 1.35
+                       and self.area_min * .8 <= target.apparent_area <= self.area_max * 1.2
+                       and abs(command.traction) <= self.traction_threshold * 1.5
+                       and abs(speed) <= self.speed_threshold * 1.5 and tof >= self.safe_tof)
+            self.elapsed = max(0.0, self.elapsed - dt * .25) if self.elapsed and relaxed else 0.0
+            self.last_reason = 'visual_or_motion_jitter' if relaxed else 'arrival_condition_lost'
         return self.arrived

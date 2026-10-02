@@ -89,6 +89,7 @@ class FlyCarEnv:
         self._w_cmd = 0.0
         self._w_cmd_prev = 0.0
         self._contact_active = False
+        self._contact_left = self._contact_right = False
         for i in range(self.m.nq):
             self.d.qpos[i] = 0.0
         self.d.qpos[2] = 0.05
@@ -211,6 +212,8 @@ class FlyCarEnv:
             tof=tof,
             contact=self._contact_active,
             timestamp=self.sim_steps * self.drive.timestep,
+            contact_left=self._contact_left,
+            contact_right=self._contact_right,
         )
 
     def apply(self, command: ActuatorCommand) -> None:
@@ -235,8 +238,9 @@ class FlyCarEnv:
     def step_kinematic(self, throttle: float, steer: float, dt: float):
         before = self.state
         candidate = step_bicycle(before, throttle, steer, self.drive, dt)
-        hit = self._motion_collides(before, candidate)
+        hit, side = self._motion_collides(before, candidate)
         self._record_contact(hit)
+        self._contact_left, self._contact_right = hit and side > 0, hit and side < 0
         if hit:
             candidate = BicycleState(before.x, before.y, before.yaw, 0.0, 0.0)
         self.state = candidate
@@ -258,7 +262,7 @@ class FlyCarEnv:
                 return True
         return False
 
-    def _motion_collides(self, before: BicycleState, after: BicycleState) -> bool:
+    def _motion_collides(self, before: BicycleState, after: BicycleState) -> tuple[bool, float]:
         distance = math.hypot(after.x - before.x, after.y - before.y)
         samples = max(1, math.ceil(distance / max(self.drive.collision_radius * 0.5, 1e-6)))
         for index in range(1, samples + 1):
@@ -269,8 +273,13 @@ class FlyCarEnv:
                 yaw=before.yaw + (after.yaw - before.yaw) * fraction,
             )
             if self._pose_collides(state):
-                return True
-        return False
+                nearest = min(self.obstacles, key=lambda item: math.hypot(state.x - item[0][0], state.y - item[0][1]), default=None)
+                if nearest is None:
+                    return True, 1.0 if state.y >= 0 else -1.0
+                dx, dy = nearest[0][0] - state.x, nearest[0][1] - state.y
+                lateral = -math.sin(state.yaw) * dx + math.cos(state.yaw) * dy
+                return True, lateral if lateral else 1.0
+        return False, 0.0
 
     def _record_contact(self, colliding: bool):
         if colliding and not self._contact_active:
