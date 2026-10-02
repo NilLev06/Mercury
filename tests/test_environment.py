@@ -111,6 +111,17 @@ class EnvironmentIntegrationTests(unittest.TestCase):
         self.assertLess(self.env.state.x, 0.0)
         self.assertFalse(self.env._contact_active)
 
+    def test_blocked_drive_keeps_the_steering_turn_for_escape(self):
+        self.env.obstacles = [((0.6, 0.0), (0.2, 0.5, 0.8))]
+        self.env.drive.max_speed = 5.0
+        self.env.drive.linear_accel = 100.0
+
+        self.env.step_kinematic(1.0, 1.0, 0.1)
+
+        self.assertTrue(self.env._contact_active)
+        self.assertAlmostEqual(self.env.state.x, 0.0)
+        self.assertGreater(self.env.state.yaw, 0.0)
+
     def test_rendered_sensor_frame_has_only_embodied_readings(self):
         with patch("fly_brain_rc.sim.env.mujoco.Renderer", HeadlessRenderer):
             env = FlyCarEnv(SimConfig(n_obstacles=0), DriveConfig(), seed=3,

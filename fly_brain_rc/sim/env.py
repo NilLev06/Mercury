@@ -242,7 +242,10 @@ class FlyCarEnv:
         self._record_contact(hit)
         self._contact_left, self._contact_right = hit and side > 0, hit and side < 0
         if hit:
-            candidate = BicycleState(before.x, before.y, before.yaw, 0.0, 0.0)
+            # Block only translation into the obstacle. Keeping the bicycle's
+            # steering/yaw response lets a trapped car turn itself toward an
+            # escape direction on subsequent control ticks.
+            candidate = BicycleState(before.x, before.y, candidate.yaw, 0.0, candidate.yaw_rate)
         self.state = candidate
         self.speed = candidate.speed
         self.heading = candidate.yaw
