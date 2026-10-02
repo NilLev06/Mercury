@@ -16,7 +16,7 @@ from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, Senso
 
 DEFAULT_ACTIONS = (
     (0.70, -0.75), (0.70, -0.35), (0.70, 0.0), (0.70, 0.35), (0.70, 0.75),
-    (-0.45, -0.65), (-0.45, 0.65),
+    (-0.70, -0.80), (-0.70, 0.0), (-0.70, 0.80),
 )
 
 
@@ -36,22 +36,28 @@ def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
     obstacle_state = "clear" if obstacle is None else _bearing("obstacle", obstacle)
     distance = "near" if sensor.tof < 0.42 else "far"
     movement = "moving" if abs(sensor.encoder_delta) >= 0.001 else "stalled"
-    return (_bearing("target", target), obstacle_state, distance, movement)
+    contact = ("contact_left" if sensor.contact_left else "contact_right" if sensor.contact_right
+               else "contact_center" if sensor.contact else "no_contact")
+    return (_bearing("target", target), obstacle_state, distance, movement, contact)
 
 
 class ExplorationReward:
     """Intrinsic drive: seek unvisited cells and avoid behavioural freezing."""
 
     def __init__(self, *, cell_size: float = 0.45, new_cell_reward: float = 1.0,
-                 idle_penalty: float = 0.04, contact_penalty: float = 0.35,
-                 goal_reward: float = 12.0):
-        if cell_size <= 0:
-            raise ValueError("cell_size must be positive")
+                 idle_penalty: float = 0.01, max_idle_penalty: float = 0.12,
+                 contact_penalty: float = 1.5, escape_reward: float = 0.5,
+                 goal_reward: float = 50.0, max_stall_steps: int = 80):
+        if cell_size <= 0 or max_stall_steps <= 0:
+            raise ValueError("cell_size and max_stall_steps must be positive")
         self.cell_size = cell_size
         self.new_cell_reward = new_cell_reward
         self.idle_penalty = idle_penalty
+        self.max_idle_penalty = max_idle_penalty
         self.contact_penalty = contact_penalty
+        self.escape_reward = escape_reward
         self.goal_reward = goal_reward
+        self.max_stall_steps = max_stall_steps
         self.reset((0.0, 0.0))
 
     def _cell(self, position: tuple[float, float]) -> tuple[int, int]:
@@ -60,6 +66,7 @@ class ExplorationReward:
     def reset(self, position: tuple[float, float]) -> None:
         self.visited = {self._cell(position)}
         self.stationary_steps = 0
+        self._contact_active = False
 
     def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool) -> float:
         reward = 0.0
@@ -69,14 +76,21 @@ class ExplorationReward:
             reward += self.new_cell_reward
         if moved:
             self.stationary_steps = 0
+            if self._contact_active and not contact:
+                reward += self.escape_reward
         else:
             self.stationary_steps += 1
-            reward -= self.idle_penalty * self.stationary_steps
-        if contact:
+            reward -= min(self.max_idle_penalty, self.idle_penalty * self.stationary_steps)
+        if contact and not self._contact_active:
             reward -= self.contact_penalty
+        self._contact_active = contact
         if reached:
             reward += self.goal_reward
         return reward
+
+    @property
+    def is_trapped(self) -> bool:
+        return self.stationary_steps >= self.max_stall_steps
 
 
 @dataclass
@@ -116,7 +130,7 @@ class QLearningAgent:
 
     def save(self, path: str | Path) -> None:
         payload = {
-            "version": 1, "actions": self.actions, "alpha": self.alpha,
+            "version": 2, "actions": self.actions, "alpha": self.alpha,
             "gamma": self.gamma, "epsilon": self.epsilon,
             "table": {"|".join(state): values for state, values in self.table.items()},
         }
@@ -125,8 +139,8 @@ class QLearningAgent:
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
-        if payload.get("version") != 1:
-            raise ValueError("unsupported RL policy")
+        if payload.get("version") != 2:
+            raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
                     alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon)
         agent.table = {tuple(key.split("|")): list(map(float, values)) for key, values in payload["table"].items()}
