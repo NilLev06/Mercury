@@ -8,7 +8,7 @@ import tempfile
 import numpy as np
 from .neural.genome import FlyGenome
 
-TOPOLOGY_VERSION = 1
+TOPOLOGY_VERSION = 2
 
 
 @dataclass(frozen=True)

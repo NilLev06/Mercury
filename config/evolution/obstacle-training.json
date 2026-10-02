@@ -1,0 +1,16 @@
+{
+  "seed": 91,
+  "generations": 2,
+  "population_size": 4,
+  "elites": 1,
+  "mutation_scale": 0.08,
+  "steps": 2400,
+  "scenario_ids": [
+    "train-0-000",
+    "train-0-001",
+    "train-0-002",
+    "trainb-73-000",
+    "trainb-73-001",
+    "trainb-73-002"
+  ]
+}
