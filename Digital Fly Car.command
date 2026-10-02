@@ -12,7 +12,7 @@ APPLESCRIPT
 [[ -z "$choice" ]] && exit 0
 scenario="${choice##*|}"
 if [[ "$scenario" == "train_rl" ]]; then
-  exec /opt/miniconda3/envs/flybrain/bin/python run.py train-rl --episodes 120 --out artifacts/rl/q-policy.json --dashboard
+  exec /opt/miniconda3/envs/flybrain/bin/python run.py train-rl --episodes 120 --out artifacts/rl/q-policy.json
 fi
 if [[ "$scenario" == "rl_corridor" ]]; then
   if [[ ! -f artifacts/rl/q-policy.json ]]; then

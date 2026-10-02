@@ -66,33 +66,13 @@ def _run_rl_trainer(args: argparse.Namespace) -> int:
         command = [_mjpython_path(), str(Path(__file__).resolve()), "train-rl",
                    "--episodes", str(args.episodes), "--steps", str(args.steps),
                    "--seed", str(args.seed), "--epsilon", str(args.epsilon), "--out", args.out]
-        if args.dashboard:
-            command.append('--dashboard')
         os.execv(command[0], command)
 
     from dataclasses import asdict
     import json
-    import webbrowser
     from fly_brain_rc.rl_training import train_q_learning
-    dashboard = mission = None
-    if args.dashboard:
-        from fly_brain_rc.dashboard.server import DashboardServer, MissionController
-        from fly_brain_rc.telemetry import TelemetryBus
-        bus, mission = TelemetryBus(), MissionController(running=True)
-        dashboard = DashboardServer(bus, mission).start()
-        webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
-        emit = bus.publish
-        progress = mission.update_training
-    else:
-        emit = progress = None
-    try:
-        result = train_q_learning(episodes=args.episodes, steps=args.steps, output=args.out,
-                                  seed=args.seed, epsilon=args.epsilon, emit=emit, progress=progress)
-        if mission is not None:
-            mission.finish({'successes': result.successes, 'mean_reward': result.mean_reward})
-    finally:
-        if dashboard is not None:
-            dashboard.close()
+    result = train_q_learning(episodes=args.episodes, steps=args.steps, output=args.out,
+                              seed=args.seed, epsilon=args.epsilon)
     print(json.dumps(asdict(result), allow_nan=False))
     return 0
 
@@ -135,7 +115,6 @@ def main() -> int:
     train_rl.add_argument('--seed', type=int, default=0)
     train_rl.add_argument('--epsilon', type=float, default=.25)
     train_rl.add_argument('--out', default='artifacts/rl/q-policy.json')
-    train_rl.add_argument('--dashboard', action='store_true', help='show live camera and learning telemetry in browser')
     args = parser.parse_args()
     if args.command == 'sim' and args.reset_memory and args.memory is None:
         parser.error('--reset-memory requires --memory PATH')

@@ -16,20 +16,12 @@ class MissionController:
         self.arrival_elapsed = 0.0
         self.arrival_reason = 'waiting_for_target'
         self.acquisition_time = None
-        self.training = None
 
     def state(self):
         with self.lock:
             return dict(status=self.status, target_class=self.target_class,
                         generation=self.generation, result=self.result,
-                        arrival_elapsed=self.arrival_elapsed, arrival_reason=self.arrival_reason,
-                        acquisition_time=self.acquisition_time, training=self.training)
-
-    def update_training(self, episode, total, reward, cells):
-        with self.lock:
-            self.training = {'episode': int(episode), 'total': int(total),
-                             'reward': float(reward), 'cells': int(cells)}
-        return self.state()
+                        arrival_elapsed=self.arrival_elapsed, arrival_reason=self.arrival_reason, acquisition_time=self.acquisition_time)
 
     def start(self, target_class):
         if target_class != 'red_ball':

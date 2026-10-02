@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import DRIVE, SIM
-from .contracts import ActuatorCommand, BrainTelemetry, MotionObservation, RuntimeTelemetry
+from .contracts import ActuatorCommand
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
 from .rl import ExplorationReward, QLearningAgent, observation_state
 from .sim.env import FlyCarEnv
@@ -20,7 +20,7 @@ class TrainingSummary:
 
 
 def train_q_learning(*, episodes: int, steps: int, output: str | Path,
-                     seed: int = 0, epsilon: float = 0.25, emit=None, progress=None) -> TrainingSummary:
+                     seed: int = 0, epsilon: float = 0.25) -> TrainingSummary:
     if type(episodes) is not int or episodes <= 0 or type(steps) is not int or steps <= 0:
         raise ValueError("episodes and steps must be positive integers")
     agent = QLearningAgent(epsilon=epsilon, seed=seed)
@@ -53,23 +53,6 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                                            contact=next_sensor.contact, reached=reached)
                 agent.update(state, action, reward, next_state, terminal=reached)
                 total += reward
-                if emit is not None:
-                    telemetry = BrainTelemetry(
-                        populations={
-                            'rl_episode_progress': (index + sequence / steps) / episodes,
-                            'rl_exploration': min(1.0, len(reward_model.visited) / 20.0),
-                            'rl_idle': min(1.0, reward_model.stationary_steps / 20.0),
-                        },
-                        threat=float(next_sensor.contact),
-                        motor_left=max(0.0, -steering), motor_right=max(0.0, steering),
-                        motor_forward=max(0.0, traction), motor_reverse=max(0.0, -traction),
-                        traction=traction, steering=steering,
-                    )
-                    emit(RuntimeTelemetry(next_sensor.timestamp, sequence, next_sensor, next_target,
-                                          MotionObservation(0.0, 0.0, 0.0, 0.0, 0.0, next_sensor.timestamp),
-                                          telemetry, ActuatorCommand(traction, steering, next_sensor.timestamp, sequence)))
-                if progress is not None:
-                    progress(index + 1, episodes, total, len(reward_model.visited))
                 if reached:
                     successes += 1
                     break
