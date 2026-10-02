@@ -19,11 +19,20 @@ class TrainingSummary:
     explored_cells: float
 
 
+def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLearningAgent:
+    """Resume the persisted policy when it exists; otherwise create its seed."""
+    output = Path(output)
+    if output.exists():
+        return QLearningAgent.load(output, epsilon=epsilon)
+    return QLearningAgent(epsilon=epsilon, seed=seed)
+
+
 def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                      seed: int = 0, epsilon: float = 0.25, emit=None, progress=None) -> TrainingSummary:
     if type(episodes) is not int or episodes <= 0 or type(steps) is not int or steps <= 0:
         raise ValueError("episodes and steps must be positive integers")
-    agent = QLearningAgent(epsilon=epsilon, seed=seed)
+    output = Path(output)
+    agent = load_training_agent(output, seed=seed, epsilon=epsilon)
     target_detector, obstacle_detector = MockRedBallDetector(), MockBlueObstacleDetector()
     rewards, cells, successes = [], [], 0
     cases = training_cases(seed, episodes, occluded=True)
@@ -81,7 +90,6 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         # Gradually reduce random exploration while keeping occasional novelty.
         agent.epsilon = max(0.04, epsilon * (1.0 - (index + 1) / (episodes * 1.15)))
 
-    output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     agent.save(output)
     return TrainingSummary(episodes, successes, sum(rewards) / episodes, sum(cells) / episodes)

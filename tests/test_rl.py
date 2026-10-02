@@ -1,7 +1,10 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 from fly_brain_rc.rl import ExplorationReward, QLearningAgent, QLearningBrain
 from fly_brain_rc.rl_training import observation_state
+from fly_brain_rc.rl_training import load_training_agent
 from fly_brain_rc.contracts import ObjectObservation, SensorFrame
 import numpy as np
 
@@ -38,6 +41,19 @@ class ReinforcementLearningTests(unittest.TestCase):
         learner.update(state, 0, 2.0, state, terminal=True)
 
         self.assertGreater(learner.value(state, 0), 0.0)
+
+    def test_training_reuses_saved_table_instead_of_starting_empty(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "policy.json"
+            state = ("target_none", "clear", "far", "moving", "no_contact")
+            learner = QLearningAgent(epsilon=0.0)
+            learner.update(state, 0, 2.0, state, terminal=True)
+            learner.save(path)
+
+            resumed = load_training_agent(path, seed=7, epsilon=.25)
+
+            self.assertGreater(resumed.value(state, 0), 0.0)
+            self.assertEqual(resumed.epsilon, .25)
 
     def test_policy_state_uses_perception_but_not_world_coordinates(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
