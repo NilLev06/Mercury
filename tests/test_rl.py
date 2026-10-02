@@ -1,6 +1,6 @@
 import unittest
 
-from fly_brain_rc.rl import ExplorationReward, QLearningAgent, QLearningBrain
+from fly_brain_rc.rl import ACTION_HOLD_STEPS, ExplorationReward, QLearningAgent, QLearningBrain
 from fly_brain_rc.rl_training import observation_state
 from fly_brain_rc.contracts import ObjectObservation, SensorFrame
 import numpy as np
@@ -51,7 +51,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         state = observation_state(sensor, target, obstacle=None)
 
-        self.assertEqual(state, ("target_right", "clear", "far", "moving", "no_contact"))
+        self.assertEqual(state, ("target_right", "target_approach", "clear", "far", "moving", "no_contact"))
 
     def test_policy_state_distinguishes_the_side_that_needs_an_escape_turn(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
@@ -63,7 +63,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
     def test_frozen_policy_turns_the_action_with_highest_learned_value_into_motor_command(self):
         agent = QLearningAgent(actions=((0.7, -0.4), (0.7, 0.4)), epsilon=0.0)
-        state = ("target_none", "clear", "far", "stalled", "no_contact")
+        state = ("target_none", "target_none", "clear", "far", "stalled", "no_contact")
         agent.table[state] = [0.1, 2.0]
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
                              0.0, 0.0, 0.8, False, 0.0)
@@ -72,6 +72,19 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         self.assertEqual((command.traction, command.steering), (0.7, 0.4))
         self.assertEqual(telemetry.populations["rl_best_value"], 2.0)
+
+    def test_policy_holds_one_action_for_a_short_control_window(self):
+        agent = QLearningAgent(actions=((0.0, 0.0), (0.7, 0.4)), epsilon=0.0)
+        state = ("target_none", "target_none", "clear", "far", "stalled", "no_contact")
+        agent.table[state] = [0.0, 2.0]
+        sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
+                             0.0, 0.0, 0.8, False, 0.0)
+        brain = QLearningBrain(agent)
+
+        commands = [brain.step(sensor, None, None, 0.0, 0.02, obstacle=None)[0]
+                    for _ in range(ACTION_HOLD_STEPS)]
+
+        self.assertTrue(all((command.traction, command.steering) == (0.7, 0.4) for command in commands))
 
 
 if __name__ == "__main__":

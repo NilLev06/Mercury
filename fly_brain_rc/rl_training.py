@@ -7,7 +7,8 @@ from pathlib import Path
 from .config import DRIVE, SIM
 from .contracts import ActuatorCommand, BrainTelemetry, MotionObservation, RuntimeTelemetry
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
-from .rl import ExplorationReward, QLearningAgent, observation_state
+from .rl import ACTION_HOLD_STEPS, ExplorationReward, QLearningAgent, observation_state
+from .neural.brain import ArrivalTracker
 from .sim.env import FlyCarEnv
 from .sim.suites import training_cases
 
@@ -32,6 +33,9 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
         reward_model = ExplorationReward()
         reward_model.reset(env.car_pose()[:2])
+        arrival = ArrivalTracker()
+        action = None
+        hold_remaining = 0
         total = 0.0
         try:
             for sequence in range(1, steps + 1):
@@ -39,18 +43,31 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 target = target_detector.detect(sensor, "red_ball")
                 obstacle = obstacle_detector.detect(sensor, "obstacle")
                 state = observation_state(sensor, target, obstacle)
-                action = agent.choose(state)
+                if action is None or hold_remaining <= 0:
+                    previous_action = action
+                    action = agent.choose(state)
+                    action_changed = previous_action is not None and action != previous_action
+                    hold_remaining = ACTION_HOLD_STEPS
+                else:
+                    action_changed = False
+                hold_remaining -= 1
                 traction, steering = agent.actions[action]
-                env.apply(ActuatorCommand(traction, steering, sensor.timestamp, sequence))
+                command = ActuatorCommand(traction, steering, sensor.timestamp, sequence)
+                env.apply(command)
 
                 next_sensor = env.sensor_frame()
                 next_target = target_detector.detect(next_sensor, "red_ball")
                 next_obstacle = obstacle_detector.detect(next_sensor, "obstacle")
                 next_state = observation_state(next_sensor, next_target, next_obstacle)
-                reached = env.goal_distance() <= env.sim_cfg.goal_radius
                 moved = abs(next_sensor.encoder_delta) >= 0.001
+                reached = arrival.update(next_target, command,
+                                         next_sensor.encoder_delta / env.drive.timestep,
+                                         next_sensor.tof, env.drive.timestep)
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
-                                           contact=next_sensor.contact, reached=reached)
+                                           contact=next_sensor.contact, reached=reached,
+                                           action_changed=action_changed)
+                if arrival.elapsed > 0:
+                    reward += 0.15
                 trapped = reward_model.is_trapped
                 if trapped:
                     reward -= 3.0
@@ -70,7 +87,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                     )
                     emit(RuntimeTelemetry(next_sensor.timestamp, sequence, next_sensor, next_target,
                                           MotionObservation(0.0, 0.0, 0.0, 0.0, 0.0, next_sensor.timestamp),
-                                          telemetry, ActuatorCommand(traction, steering, next_sensor.timestamp, sequence)))
+                                          telemetry, command))
                 if progress is not None:
                     progress(index + 1, episodes, total, len(reward_model.visited))
                 if reached:
