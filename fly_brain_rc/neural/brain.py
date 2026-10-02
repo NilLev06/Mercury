@@ -12,6 +12,7 @@ from fly_brain_rc.neural.genome import FlyGenome
 
 class NeuralFlyBrain:
     POPULATIONS = ('target_left', 'target_center', 'target_right', 'target_size',
+                   'obstacle_left', 'obstacle_center', 'obstacle_right', 'obstacle_size',
                    'flow_left', 'flow_center', 'flow_right', 'looming', 'proximity',
                    'contact', 'familiarity', 'habituation', 'exploration', 'threat',
                    'motor_left', 'motor_right', 'motor_forward', 'motor_reverse')
@@ -34,7 +35,7 @@ class NeuralFlyBrain:
         self._visits = np.zeros(self.compass.RING_SIZE)
         self._sequence = 0
 
-    def step(self, sensor, target, motion, familiarity, dt):
+    def step(self, sensor, target, motion, familiarity, dt, *, obstacle=None):
         values = (sensor.yaw_rate, sensor.encoder_delta, sensor.tof, sensor.timestamp,
                   motion.flow_left, motion.flow_center, motion.flow_right,
                   motion.optic_rotation, motion.looming, familiarity, dt)
@@ -45,6 +46,13 @@ class NeuralFlyBrain:
                                    or not 0 <= target.apparent_area <= 1
                                    or not 0 <= target.confidence <= 1):
             raise ValueError('invalid target observation')
+        if obstacle is not None and (obstacle.class_name != 'obstacle'
+                                     or not all(math.isfinite(value) for value in
+                                                (obstacle.bearing, obstacle.apparent_area,
+                                                 obstacle.confidence))
+                                     or not 0 <= obstacle.apparent_area <= 1
+                                     or not 0 <= obstacle.confidence <= 1):
+            raise ValueError('invalid obstacle observation')
         g = self.genome
         old = dict(zip(self.POPULATIONS, self._state))
         heading = self.compass.heading
@@ -58,10 +66,17 @@ class NeuralFlyBrain:
         right = confidence * max(0.0, math.sin(bearing))
         center = confidence * max(0.0, math.cos(bearing))
         area = target.apparent_area if target is not None else 0.0
+        obstacle_confidence = obstacle.confidence if obstacle is not None else 0.0
+        obstacle_bearing = obstacle.bearing if obstacle is not None else 0.0
+        obstacle_area = obstacle.apparent_area if obstacle is not None else 0.0
+        obstacle_left = obstacle_confidence * max(0.0, -math.sin(obstacle_bearing))
+        obstacle_right = obstacle_confidence * max(0.0, math.sin(obstacle_bearing))
+        obstacle_center = obstacle_confidence * max(0.0, math.cos(obstacle_bearing))
+        obstacle_size = min(1.0, obstacle_area / 0.02)
         size = min(1.0, area / g.arrival_area)
         proximity = float(np.clip(1 - sensor.tof / g.proximity_distance, 0, 1))
         looming = g.looming_gain * float(np.clip(motion.looming, 0, 1))
-        threat_input = max(looming, proximity, float(sensor.contact))
+        threat_input = max(looming, proximity, float(sensor.contact), obstacle_size)
         sensory_threat = max(old['looming'], old['proximity'], old['contact'])
         displacement = math.tanh(math.hypot(*self.compass.home_vector))
         return_familiarity = (1 - displacement) * old['habituation']
@@ -70,7 +85,9 @@ class NeuralFlyBrain:
         # permits immediate threat response without sequential population updates.
         drive = {name: -4.0 for name in self.POPULATIONS}
         for name, value in (('target_left', left), ('target_center', center), ('target_right', right),
-                            ('target_size', size), ('flow_left', abs(motion.flow_left)),
+                            ('target_size', size), ('obstacle_left', obstacle_left),
+                            ('obstacle_center', obstacle_center), ('obstacle_right', obstacle_right),
+                            ('obstacle_size', obstacle_size), ('flow_left', abs(motion.flow_left)),
                             ('flow_center', abs(motion.flow_center)), ('flow_right', abs(motion.flow_right)),
                             ('looming', looming), ('proximity', proximity), ('contact', float(sensor.contact)),
                             ('familiarity', familiarity)):
@@ -84,6 +101,8 @@ class NeuralFlyBrain:
         exploration = old['exploration'] * (1 - confidence)
         steering_drive = g.target_gain * (right - left + memory_right - memory_left +
                                           0.5 * (old['target_right'] - old['target_left'])) + g.exploration_turn_gain * exploration * turn + (threat_input + sensory_threat) * avoidance + 0.5 * (old['flow_left'] - old['flow_right'])
+        steering_drive -= g.threat_gain * (obstacle_right - obstacle_left +
+                                            0.5 * (old['obstacle_right'] - old['obstacle_left']))
         drive['motor_right'] = -2 + steering_drive - 2 * old['motor_left']
         drive['motor_left'] = -2 - steering_drive - 2 * old['motor_right']
         braking = confidence * min(2.0, area / g.arrival_area)

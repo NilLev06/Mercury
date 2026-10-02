@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from fly_brain_rc.contracts import MotionObservation, ObjectObservation, SensorFrame
-from fly_brain_rc.perception import MockRedBallDetector, MotionEstimator, VisualDescriptor
+from fly_brain_rc.perception import MockBlueObstacleDetector, MockRedBallDetector, MotionEstimator, VisualDescriptor
 
 
 def make_frame(rgb: np.ndarray, timestamp: float = 4.2) -> SensorFrame:
@@ -34,6 +34,15 @@ def square_frame(center_x: int, size: int, timestamp: float) -> SensorFrame:
 
 
 class PerceptionTests(unittest.TestCase):
+    def test_blue_obstacle_detector_emits_directional_observation(self):
+        rgb = np.zeros((96, 128, 3), dtype=np.uint8)
+        cv2.circle(rgb, (100, 48), 18, (64, 153, 224), -1)
+        observation = MockBlueObstacleDetector().detect(make_frame(rgb), "obstacle")
+        self.assertIsInstance(observation, ObjectObservation)
+        self.assertEqual(observation.class_name, "obstacle")
+        self.assertGreater(observation.bearing, 0.0)
+        self.assertGreater(observation.apparent_area, 0.0)
+
     def test_perspective_yaw_flow_is_removed_before_looming(self):
         from dataclasses import replace
         from unittest.mock import patch

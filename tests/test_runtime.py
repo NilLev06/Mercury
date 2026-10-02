@@ -28,19 +28,21 @@ class RuntimeTests(unittest.TestCase):
         frame = SensorFrame(np.zeros((8, 8, 3), dtype=np.uint8), np.zeros((8, 8), dtype=np.uint8), 0, 0, 1.2, False, 0)
         command = ActuatorCommand(.2, .1, 0, 1)
         def call(name, value):
-            def invoke(*args):
+            def invoke(*args, **kwargs):
                 calls.append(name)
                 return value
             return invoke
         env = SimpleNamespace(sensor_frame=call('read', frame), apply=call('apply', None))
         brain = SimpleNamespace(step=call('brain', (command, BrainTelemetry())))
         detector = SimpleNamespace(detect=call('target', None))
+        obstacle_detector = SimpleNamespace(detect=call('obstacle', None))
         motion = SimpleNamespace(update=call('motion', MotionObservation(0, 0, 0, 0, 0, 0)))
         descriptor = SimpleNamespace(encode=call('descriptor', np.ones(64)))
         memory = SimpleNamespace(observe=call('memory', .3))
-        runtime = FlyRuntime(env, brain, .02, detector=detector, motion=motion, descriptor=descriptor, memory=memory, emit=call('emit', None))
+        runtime = FlyRuntime(env, brain, .02, detector=detector, obstacle_detector=obstacle_detector,
+                             motion=motion, descriptor=descriptor, memory=memory, emit=call('emit', None))
         record = runtime.tick()
-        self.assertEqual(calls, ['read', 'target', 'motion', 'descriptor', 'memory', 'brain', 'apply', 'emit'])
+        self.assertEqual(calls, ['read', 'target', 'obstacle', 'motion', 'descriptor', 'memory', 'brain', 'apply', 'emit'])
         self.assertIs(record.sensor, frame)
         self.assertIs(record.command, command)
 

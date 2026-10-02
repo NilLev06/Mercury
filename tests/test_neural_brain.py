@@ -28,6 +28,14 @@ class NeuralBrainTests(unittest.TestCase):
         self.assertLessEqual(command.traction, 0.0)
         self.assertGreater(telemetry.motor_reverse, telemetry.motor_forward)
 
+    def test_visible_obstacle_on_right_excites_a_leftward_turn_before_contact(self):
+        brain = NeuralFlyBrain()
+        obstacle = ObjectObservation('obstacle', 1.0, (.6, .3, .9, .8), .7, .2, 0.0)
+        for _ in range(30):
+            command, telemetry = brain.step(*inputs(area=0.0), 0.0, 0.02, obstacle=obstacle)
+        self.assertLess(command.steering, -0.1)
+        self.assertGreater(telemetry.populations['obstacle_right'], .1)
+
     def test_reset_reproduces_and_memory_decays(self):
         brain = NeuralFlyBrain()
         first = brain.step(*inputs(bearing=0.7), 0.2, 0.02)

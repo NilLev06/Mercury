@@ -2,6 +2,6 @@
 
 from .familiarity import VisualDescriptor
 from .motion import MotionEstimator
-from .target import MockRedBallDetector, TargetDetector
+from .target import MockBlueObstacleDetector, MockRedBallDetector, TargetDetector
 
-__all__ = ["MockRedBallDetector", "MotionEstimator", "TargetDetector", "VisualDescriptor"]
+__all__ = ["MockBlueObstacleDetector", "MockRedBallDetector", "MotionEstimator", "TargetDetector", "VisualDescriptor"]

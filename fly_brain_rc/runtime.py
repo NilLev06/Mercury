@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from .memory import FamiliarityMemory
 from .neural.brain import NeuralFlyBrain, ArrivalTracker
 from .neural.genome import FlyGenome
-from .perception.target import MockRedBallDetector
+from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
 from .perception.motion import MotionEstimator
 from .perception.familiarity import VisualDescriptor
 
@@ -19,7 +19,7 @@ def load_genome(path=None):
 
 class FlyRuntime:
     def __init__(self, env, brain=None, dt=None, target='red_ball', *, detector=None,
-                 motion=None, descriptor=None, memory=None, emit=None, mission=None):
+                 obstacle_detector=None, motion=None, descriptor=None, memory=None, emit=None, mission=None):
         self.env = env
         self.brain = brain if brain is not None else NeuralFlyBrain()
         self.dt = dt if dt is not None else env.drive.timestep
@@ -29,6 +29,7 @@ class FlyRuntime:
             raise ValueError('unsupported target')
         self.target = target
         self.detector = detector if detector is not None else MockRedBallDetector()
+        self.obstacle_detector = obstacle_detector if obstacle_detector is not None else MockBlueObstacleDetector()
         self.motion = motion if motion is not None else MotionEstimator()
         self.descriptor = descriptor if descriptor is not None else VisualDescriptor()
         self.memory = memory if memory is not None else FamiliarityMemory()
@@ -58,9 +59,10 @@ class FlyRuntime:
                 self.brain = NeuralFlyBrain(self.brain.genome)
         sensor = self.env.sensor_frame()
         target = self.detector.detect(sensor, self.target)
+        obstacle = self.obstacle_detector.detect(sensor, 'obstacle')
         motion = self.motion.update(sensor, self.dt)
         familiarity = self.memory.observe(self.descriptor.encode(sensor.gray), sensor.timestamp)
-        command, brain = self.brain.step(sensor, target, motion, familiarity, self.dt)
+        command, brain = self.brain.step(sensor, target, motion, familiarity, self.dt, obstacle=obstacle)
         if self.mission is not None:
             self._sequence += 1
             active = self.mission.status == 'running'
