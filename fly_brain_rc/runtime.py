@@ -11,6 +11,7 @@ from .neural.genome import FlyGenome
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
 from .perception.motion import MotionEstimator
 from .perception.familiarity import VisualDescriptor
+from .docking import DockingTracker
 
 
 def load_genome(path=None):
@@ -37,7 +38,7 @@ class FlyRuntime:
         self.emit = emit
         self.mission = mission
         self.bypass_evaluation = bypass_evaluation
-        self.arrival = ArrivalTracker()
+        self.arrival = DockingTracker() if bypass_evaluation else ArrivalTracker()
         self._generation = -1
         self._sequence = 0
         self._acquisition_time = None
@@ -73,18 +74,15 @@ class FlyRuntime:
             if active:
                 if target is not None and self._acquisition_time is None:
                     self._acquisition_time = sensor.timestamp
-                # Explicit simulator evaluation only; no coordinate reaches the
-                # brain. Bypass experiment scores reach, not learned stopping.
-                arrived = (self.env.goal_distance() <= self.env.sim_cfg.goal_radius if self.bypass_evaluation
+                # Bypass trainer and viewer share sensor-only stable docking.
+                arrived = (self.arrival.update(sensor,target,command,self.dt) if self.bypass_evaluation
                            else self.arrival.update(target, command, sensor.encoder_delta / self.dt, sensor.tof, self.dt))
                 self.mission.arrival_elapsed = self.arrival.elapsed
                 self.mission.arrival_reason = self.arrival.last_reason
-                if self.bypass_evaluation:
-                    self.mission.arrival_reason = 'bypass_reached' if arrived else 'bypass_in_progress'
                 self.mission.acquisition_time = self._acquisition_time
                 if arrived:
                     self.mission.status = 'finished'
-                    self.mission.result = {'stable_arrival': not self.bypass_evaluation, 'timestamp': sensor.timestamp}
+                    self.mission.result = {'stable_arrival': True, 'timestamp': sensor.timestamp}
                     if self.bypass_evaluation:
                         self.mission.result['goal_reached'] = True
             if not active or self.mission.status == 'finished':

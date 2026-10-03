@@ -14,6 +14,7 @@ from .sim.env import FlyCarEnv
 from .sim.kinematics import BicycleState
 from .sim.scenarios import BLUE, Scenario
 from .sim.suites import SuiteCase
+from .docking import DockingTracker, prepare_docking, target_view, ranges
 
 
 def bypass_cases(seed, count, *, held_out=False):
@@ -39,11 +40,34 @@ class BypassReward:
         self.distance = distance
         self.contact = False
         self.steering = 0.0
+        self.risk = None
+        self.alignment = None
 
-    def step(self, distance, *, contact, steering, reached, dt):
+    def step(self, distance, *, contact, steering, reached, dt,
+             sensor=None,target=None,command=None):
         # Dense trainer-only distance potential: a detour can cost temporarily,
         # but progress and a successful pass outweigh time/contact costs.
-        reward = 8*(self.distance-distance)-.15*dt
+        reward = 8*(max(0,self.distance-.70)-max(0,distance-.70))-.15*dt
+        reward -= 4*max(0,.60-distance)*dt
+        if sensor is not None:
+            view = target_view(sensor,target)
+            # Target rays still have a hard stand-off: exempt only the safe
+            # approach band, never contact or driving through the sphere.
+            risk = sum(max(0,(.12 if i<3 and view.rays[i] else .20)-gap)
+                       for i,gap in enumerate(ranges(sensor)))
+            if self.risk is not None:
+                reward -= 5*max(0,risk-self.risk)
+            self.risk = risk
+            alignment = abs(target.bearing) if target is not None and view.stage != 'far' else None
+            if alignment is not None and self.alignment is not None:
+                reward += .5*(self.alignment-alignment)
+            self.alignment = alignment
+            parked = (view.parking and abs(sensor.speed)<=.025 and command is not None
+                      and abs(command.traction)<=.05 and abs(command.steering)<=.05)
+            if parked:
+                reward += 2*dt
+            elif abs(sensor.speed)<.025:
+                reward -= .5*dt
         if contact:
             reward -= .8*dt + (2 if not self.contact else 0)
         reward -= .03*abs(steering-self.steering)
@@ -84,8 +108,7 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
             shutil.copy2(output,backup)
     cases = bypass_cases(seed if evaluate else seed+agent.training_runs*10_007,
                          episodes,held_out=evaluate)
-    if not evaluate:
-        agent.sensor_schema = 2
+    prepare_docking(agent)
     detector, obstacles = MockRedBallDetector(),MockBlueObstacleDetector()
     totals,successes = [],0
     cancelled = False
@@ -99,6 +122,7 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
         env._sync_kinematic()
         env._last_encoder_position = env._encoder_position()
         controller = RLController(agent)
+        arrival = DockingTracker()
         reward_model = BypassReward(env.goal_distance())
         total,contacts,remaining = 0.0,0,0
         reached = False
@@ -115,14 +139,17 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
                     window_state,window_reward = state,0.0
                     remaining = max(1,round(ACTION_DURATION/DRIVE.timestep))
                 traction,steering = agent.actions[action]
-                env.apply(ActuatorCommand(traction,steering,sensor.timestamp,sequence))
+                command = ActuatorCommand(traction,steering,sensor.timestamp,sequence)
+                # Same pre-application sensor/command predicate as the viewer.
+                reached = arrival.update(sensor,detector.detect(sensor,'red_ball'),command,DRIVE.timestep)
+                env.apply(command)
                 applied_steps += 1
                 next_sensor = env.sensor_frame()
                 target = detector.detect(next_sensor,'red_ball')
                 next_state = controller.observe(next_sensor,target,obstacles.detect(next_sensor,'obstacle'))
-                reached = env.goal_distance() <= SIM.goal_radius
                 reward = reward_model.step(env.goal_distance(),contact=next_sensor.contact,
-                                           steering=steering,reached=reached,dt=DRIVE.timestep)
+                                           steering=steering,reached=reached,dt=DRIVE.timestep,
+                                           sensor=next_sensor,target=target,command=command)
                 total += reward
                 contacts += int(next_sensor.contact)
                 window_reward += reward
@@ -151,7 +178,8 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
             env.renderer.close()
         totals.append(total)
         successes += int(reached)
-        report = dict(task='bypass-v1',sensor_schema=2,run=run,episode=index+1,seed=case.seed,
+        report = dict(task='bypass-v1',sensor_schema=3,arrival_criterion='stable-docking-v1',
+                      stable_stop=arrival.elapsed,run=run,episode=index+1,seed=case.seed,
                       evaluation=evaluate,success=reached,cancelled=cancelled,
                       steps=applied_steps,reward=total,contacts=env.collisions,
                       contact_seconds=contacts*DRIVE.timestep,minimum_final_distance=env.goal_distance())
