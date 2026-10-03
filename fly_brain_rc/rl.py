@@ -13,6 +13,7 @@ import random
 
 from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, SensorFrame
 from .recovery import RecoveryManoeuvre
+from .navigation_memory import NavigationMemory
 
 
 DEFAULT_ACTIONS = (
@@ -21,7 +22,7 @@ DEFAULT_ACTIONS = (
     (-0.70, -0.80), (-0.70, 0.0), (-0.70, 0.80),
 )
 ACTION_DURATION = 0.2
-POLICY_VERSION = 6
+POLICY_VERSION = 7
 
 
 def _bearing(label: str, observation: ObjectObservation | None) -> str:
@@ -130,10 +131,13 @@ class QLearningAgent:
         self.legacy_inference = False
 
     def values(self, state):
-        return self.table.get(tuple(state[:8] if self.legacy_inference else state), [0.0] * len(self.actions))
+        state = tuple(state)
+        if state not in self.table and state[0].startswith('target_memory_'):
+            state = (state[0].replace('target_memory_','target_',1),)+state[1:]
+        return self.table.get(state, [0.0] * len(self.actions))
 
     def _values(self, state: tuple[str, ...]) -> list[float]:
-        return self.table.setdefault(tuple(state), [0.0] * len(self.actions))
+        return self.table.setdefault(tuple(state), list(self.values(state)))
 
     def value(self, state: tuple[str, ...], action: int) -> float:
         return self._values(state)[action]
@@ -169,7 +173,8 @@ class QLearningAgent:
         candidates = [i for i in admissible if values[i] == best]
         # Deterministic, low-speed fallback toward a visible target or a free
         # side. With no target, keep a gentle search turn, not blind reversing.
-        steer = -0.65 if state[0] == 'target_left' else .65 if state[0] == 'target_right' else 0.0
+        target_direction = state[0].replace('target_memory_','target_',1)
+        steer = -0.65 if target_direction == 'target_left' else .65 if target_direction == 'target_right' else 0.0
         if state[4] == 'blocked' or state[1] == 'obstacle_center':
             rank = {'blocked': 0, 'near': 1, 'clear': 2}
             steer = -.65 if rank[state[3]] > rank[state[5]] else .65
@@ -197,7 +202,7 @@ class QLearningAgent:
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0, seed: int = 0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
-        if payload.get("version") not in (4, 5, POLICY_VERSION):
+        if payload.get("version") not in (4, 5, 6, POLICY_VERSION):
             raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
                     alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon, seed=seed)
@@ -238,13 +243,23 @@ class RLController:
         self.blocked_seconds = 0.0
         self.timestamp = None
         self.recovery = RecoveryManoeuvre()
+        self.navigation = NavigationMemory()
         self.sensor = None
         self.overriding = False
+
+    @property
+    def mode(self):
+        return self.recovery.phase if self.recovery.phase != 'drive' else 'bypass_'+self.navigation.phase if self.navigation.phase != 'drive' else 'drive'
 
     def observe(self, sensor, target, obstacle):
         self.sensor = sensor
         traction = None if self.action is None else self.agent.actions[self.action][0]
+        old_phase = self.recovery.phase
         self.recovery.observe(sensor, traction, obstacle, target)
+        self.navigation.observe(sensor,target,obstacle,recovering=self.recovery.phase != 'drive',
+                                recovered=old_phase != 'drive' and self.recovery.phase == 'drive')
+        if old_phase == 'drive' and self.recovery.phase == 'retreat' and self.navigation.phase != 'drive':
+            self.recovery.turn = self.navigation.side
         elapsed = 0 if self.timestamp is None else max(0, sensor.timestamp-self.timestamp)
         self.timestamp = sensor.timestamp
         if traction is not None and sensor.contact and abs(sensor.encoder_delta) < .0001:
@@ -255,10 +270,16 @@ class RLController:
                 self.blocked_seconds = 0.0
         else:
             self.blocked_seconds = 0.0
-        return observation_state(sensor, target, obstacle)
+        effective = target if target is not None else self.navigation.recalled_target(sensor)
+        state = observation_state(sensor,effective,obstacle)
+        if target is None and effective is not None:
+            state = (state[0].replace('target_','target_memory_',1),)+state[1:]
+        return state
 
     def choose(self, state, *, explore):
         command = self.recovery.command(self.sensor)
+        if command is None:
+            command = self.navigation.command()
         self.overriding = command is not None
         if self.overriding:
             t,w = command
@@ -285,9 +306,9 @@ class QLearningBrain:
 
     def step(self, sensor: SensorFrame, target: ObjectObservation | None, motion,
              familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
-        old_phase = self.controller.recovery.phase
+        old_mode = self.controller.mode
         state = self.controller.observe(sensor, target, obstacle)
-        if self._action is None or sensor.timestamp >= self._until - 1e-9 or old_phase != self.controller.recovery.phase:
+        if self._action is None or sensor.timestamp >= self._until - 1e-9 or old_mode != self.controller.mode:
             self._action = self.controller.choose(state, explore=False)
             self._until = sensor.timestamp + ACTION_DURATION
         action = self._action
@@ -295,7 +316,10 @@ class QLearningBrain:
         value = self.agent.values(state)[action]
         command = ActuatorCommand(traction, steering, sensor.timestamp, 0)
         telemetry = BrainTelemetry(
-            populations={"rl_best_value": value, "rl_known_states": float(len(self.agent.table))},
+            populations={"rl_best_value": value, "rl_known_states": float(len(self.agent.table)),
+                         "rl_target_memory": float(self.controller.navigation.vector is not None),
+                         "rl_memory_confidence": self.controller.navigation.confidence,
+                         "rl_bypass_active": float(self.controller.navigation.phase != 'drive')},
             familiarity=familiarity,
             threat=float(sensor.contact),
             motor_left=max(0.0, -steering), motor_right=max(0.0, steering),

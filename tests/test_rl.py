@@ -15,6 +15,110 @@ import numpy as np
 
 
 class ReinforcementLearningTests(unittest.TestCase):
+    def test_memory_confidence_decays_in_telemetry(self):
+        b = QLearningBrain(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,1.2,False,0)
+        goal = ObjectObservation('red_ball',1,(.4,.4,.6,.6),0,.04,0)
+        _, visible = b.step(s,goal,None,0,.02)
+        _, recalled = b.step(replace(s,timestamp=6),None,None,0,.02)
+        _, expired = b.step(replace(s,timestamp=13),None,None,0,.02)
+        self.assertEqual(visible.populations['rl_memory_confidence'],1)
+        self.assertAlmostEqual(recalled.populations['rl_memory_confidence'],np.exp(-1))
+        self.assertEqual(expired.populations['rl_memory_confidence'],0)
+
+    def test_recalled_state_warm_start_does_not_mutate_visible_values(self):
+        a = QLearningAgent()
+        visible = ('target_left','clear','small','clear','clear','clear','forward','no_contact','no_contact')
+        recalled = ('target_memory_left',)+visible[1:]
+        a.table[visible] = [2.0]*len(a.actions)
+        self.assertEqual(a.values(recalled),a.values(visible))
+        self.assertNotIn(recalled,a.table)
+        a.value(recalled,0)
+        a.table[recalled][0] = 3.0
+        self.assertEqual(a.table[visible][0],2.0)
+
+    def test_contact_recovery_overrides_bypass_and_resumes_along(self):
+        from fly_brain_rc.rl import RLController
+        c = RLController(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,.6,False,0)
+        obstacle = ObjectObservation('obstacle',1,(.3,.3,.7,.8),0,.1,0)
+        state = c.observe(s,None,obstacle)
+        action = c.choose(state,explore=False)
+        self.assertEqual(c.mode,'bypass_outward')
+        self.assertGreater(c.agent.actions[action][0],0)
+        state = c.observe(replace(s,timestamp=.02,contact=True,contact_front=True),None,obstacle)
+        action = c.choose(state,explore=False)
+        self.assertEqual(c.mode,'retreat')
+        self.assertLess(c.agent.actions[action][0],0)
+        self.assertTrue(c.overriding)
+        # Physical encoder progress completes the retreat, arc and clear.
+        c.observe(replace(s,timestamp=.04,encoder_delta=-.4),None,obstacle)
+        c.observe(replace(s,timestamp=1.04,encoder_delta=.4,yaw_rate=c.recovery.turn*1.2),None,obstacle)
+        c.observe(replace(s,timestamp=1.06,encoder_delta=.4),None,None)
+        self.assertEqual(c.mode,'bypass_along')
+
+    def test_recalled_direction_has_directional_fallback(self):
+        a = QLearningAgent()
+        state = ('target_memory_left','clear','small','clear','clear','clear','forward','no_contact','no_contact')
+        action = a.choose(state,explore=False)
+        self.assertLess(a.actions[action][1],0)
+
+    def test_brain_reset_clears_target_and_bypass_memory(self):
+        b = QLearningBrain(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,.6,False,0)
+        goal = ObjectObservation('red_ball',1,(.4,.4,.6,.6),0,.04,0)
+        obstacle = ObjectObservation('obstacle',1,(.3,.3,.7,.8),0,.1,0)
+        b.step(s,goal,None,0,.02,obstacle=obstacle)
+        b.reset()
+        self.assertIsNone(b.controller.navigation.vector)
+        self.assertEqual(b.controller.navigation.phase,'drive')
+
+    def test_target_memory_turns_with_gyro_and_expires(self):
+        from fly_brain_rc.rl import RLController
+        c = RLController(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,1.2,False,0)
+        goal = ObjectObservation('red_ball',1,(.4,.4,.6,.6),0,.04,0)
+        c.observe(s,goal,None)
+        state = c.observe(replace(s,timestamp=1,yaw_rate=.4),None,None)
+        self.assertEqual(state[0],'target_memory_left')
+        state = c.observe(replace(s,timestamp=13),None,None)
+        self.assertEqual(state[0],'target_none')
+
+    def test_target_memory_updates_range_with_encoder_without_world_pose(self):
+        from fly_brain_rc.rl import RLController
+        c = RLController(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,1.2,False,0)
+        goal = ObjectObservation('red_ball',1,(.4,.4,.6,.6),.5,.04,0)
+        c.observe(s,goal,None)
+        before = c.navigation.goal_bearing
+        c.observe(replace(s,timestamp=.2,encoder_delta=.2),None,None)
+        self.assertGreater(c.navigation.goal_bearing,before)
+
+    def test_bypass_side_is_retained_when_ranges_change(self):
+        from fly_brain_rc.rl import RLController
+        c = RLController(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,.6,False,0,
+                        range_left=1.2,range_right=.4)
+        obstacle = ObjectObservation('obstacle',1,(.3,.3,.7,.8),0,.1,0)
+        c.observe(s,None,obstacle)
+        side = c.navigation.side
+        c.observe(replace(s,timestamp=.2,range_left=.2,range_right=1.2),None,obstacle)
+        self.assertEqual(c.navigation.side,side)
+        self.assertNotEqual(side,0)
+
+    def test_v6_migration_retains_policy_and_training_count(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory)/'policy.json'
+            key = 'target_center|clear|small|clear|clear|clear|forward|no_contact|no_contact'
+            old = json.dumps(dict(version=6,actions=[[.3,0],[-.7,0]],alpha=.18,gamma=.98,
+                                 training_runs=2,table={key:[4,-2]}))
+            p.write_text(old)
+            a = load_training_agent(p,seed=0,epsilon=.25)
+            self.assertEqual(a.table[tuple(key.split('|'))],[4,-2])
+            self.assertEqual(a.training_runs,2)
+            self.assertEqual(p.with_name('policy.json.v6.bak').read_text(),old)
+
     def test_centered_visible_goal_does_not_start_range_avoidance(self):
         from fly_brain_rc.rl import RLController
         c = RLController(QLearningAgent())
@@ -40,6 +144,25 @@ class ReinforcementLearningTests(unittest.TestCase):
             # windows must not populate Q with scripted reverse/arc commands.
             self.assertEqual(len(a.table),1)
             self.assertEqual(sum(v != 0 for row in a.table.values() for v in row),1)
+
+    def test_training_bypass_does_not_update_q_or_reward_recalled_target(self):
+        goal = ObjectObservation('red_ball',1,(.4,.4,.6,.6),0,.04,0)
+        obstacle = ObjectObservation('obstacle',1,(.3,.3,.7,.8),0,.1,0)
+        frames = []
+        def sensor_frame(env):
+            return SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),
+                               0,0,.6,False,env.sim_steps*env.drive.timestep)
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('fly_brain_rc.sim.env.mujoco.Renderer', HeadlessRenderer), \
+             patch.object(FlyCarEnv,'sensor_frame',sensor_frame), \
+             patch('fly_brain_rc.rl_training.MockRedBallDetector.detect',side_effect=[goal]+[None]*20), \
+             patch('fly_brain_rc.rl_training.MockBlueObstacleDetector.detect',return_value=obstacle), \
+             patch.object(ExplorationReward,'step',autospec=True,return_value=0) as reward:
+            p = Path(directory)/'policy.json'
+            train_q_learning(episodes=1,steps=20,output=p,epsilon=0,emit=frames.append)
+            self.assertEqual(QLearningAgent.load(p).table,{})
+            self.assertTrue(all(f.brain.populations['rl_target_memory'] == 1 for f in frames))
+            self.assertTrue(all(call.kwargs['target'] is None for call in reward.call_args_list))
 
     def test_contact_release_leads_to_committed_arc_not_pursuit(self):
         from fly_brain_rc.rl import RLController

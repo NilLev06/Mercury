@@ -34,7 +34,7 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
                 backup = output.with_name(output.name + f'.v{version}.{index}.bak')
                 index += 1
             shutil.copy2(output, backup)
-            if version == 5:
+            if version in (5,6):
                 print(f'Old policy preserved: {backup}. Migrating compact observations.',flush=True)
                 return QLearningAgent.load(output,epsilon=epsilon,seed=seed)
             print(f'Old policy preserved: {backup}. Starting new observation schema.', flush=True)
@@ -105,9 +105,9 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 next_sensor = env.sensor_frame()
                 next_target = target_detector.detect(next_sensor, "red_ball")
                 next_obstacle = obstacle_detector.detect(next_sensor, "obstacle")
-                old_phase = controller.recovery.phase
+                old_mode = controller.mode
                 next_state = controller.observe(next_sensor, next_target, next_obstacle)
-                phase_changed = old_phase != controller.recovery.phase
+                phase_changed = old_mode != controller.mode
                 reached = env.goal_distance() <= env.sim_cfg.goal_radius
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
@@ -123,7 +123,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 if remaining == 0 or reached or sequence == steps or phase_changed:
                     if window_learnable:
                         agent.update(window_state, action, window_reward, next_state,
-                                     terminal=reached or controller.recovery.phase != 'drive')
+                                     terminal=reached or controller.mode != 'drive')
                     remaining = 0
                 sensor, state = next_sensor, next_state
                 total += reward
@@ -133,6 +133,9 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                             'rl_episode_progress': (index + sequence / steps) / episodes,
                             'rl_exploration': min(1.0, len(reward_model.visited) / 20.0),
                             'rl_idle': min(1.0, reward_model.stationary_steps / 20.0),
+                            'rl_target_memory': float(controller.navigation.vector is not None),
+                            'rl_memory_confidence': controller.navigation.confidence,
+                            'rl_bypass_active': float(controller.navigation.phase != 'drive'),
                         },
                         threat=float(next_sensor.contact),
                         motor_left=max(0.0, -steering), motor_right=max(0.0, steering),
