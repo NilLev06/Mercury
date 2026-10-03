@@ -115,6 +115,7 @@ class QLearningAgent:
         self.actions = tuple((float(traction), float(steering)) for traction, steering in self.actions)
         self._rng = random.Random(self.seed)
         self.table: dict[tuple[str, ...], list[float]] = {}
+        self.training_runs = 0
 
     def _values(self, state: tuple[str, ...]) -> list[float]:
         return self.table.setdefault(tuple(state), [0.0] * len(self.actions))
@@ -140,18 +141,20 @@ class QLearningAgent:
         payload = {
             "version": 2, "actions": self.actions, "alpha": self.alpha,
             "gamma": self.gamma, "epsilon": self.epsilon,
+            "training_runs": self.training_runs,
             "table": {"|".join(state): values for state, values in self.table.items()},
         }
         Path(path).write_text(json.dumps(payload, sort_keys=True))
 
     @classmethod
-    def load(cls, path: str | Path, *, epsilon: float = 0.0) -> "QLearningAgent":
+    def load(cls, path: str | Path, *, epsilon: float = 0.0, seed: int = 0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
         if payload.get("version") != 2:
             raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
-                    alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon)
+                    alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon, seed=seed)
         agent.table = {tuple(key.split("|")): list(map(float, values)) for key, values in payload["table"].items()}
+        agent.training_runs = int(payload.get("training_runs", 0))
         if any(len(values) != len(agent.actions) for values in agent.table.values()):
             raise ValueError("invalid RL policy table")
         return agent

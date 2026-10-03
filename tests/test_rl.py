@@ -64,6 +64,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
             self.assertGreater(resumed.value(state, 0), 0.0)
             self.assertEqual(resumed.epsilon, .25)
+            self.assertEqual(resumed.training_runs, 0)
 
     def test_policy_state_uses_perception_but_not_world_coordinates(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),

@@ -23,7 +23,7 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
     """Resume the persisted policy when it exists; otherwise create its seed."""
     output = Path(output)
     if output.exists():
-        return QLearningAgent.load(output, epsilon=epsilon)
+        return QLearningAgent.load(output, epsilon=epsilon, seed=seed)
     return QLearningAgent(epsilon=epsilon, seed=seed)
 
 
@@ -33,12 +33,25 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         raise ValueError("episodes and steps must be positive integers")
     output = Path(output)
     agent = load_training_agent(output, seed=seed, epsilon=epsilon)
+    run_seed = seed + agent.training_runs * 10_007
+    agent._rng.seed(run_seed)
     target_detector, obstacle_detector = MockRedBallDetector(), MockBlueObstacleDetector()
     rewards, cells, successes = [], [], 0
-    cases = training_cases(seed, episodes, occluded=True)
+    open_cases = training_cases(run_seed, episodes)
+    occluded_cases = training_cases(run_seed + 1, episodes, occluded=True)
 
-    for index, case in enumerate(cases):
-        env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
+    for index in range(episodes):
+        # Every launch expands the map experience.  Within a launch, advance
+        # from direct pursuit to one occluder and finally cluttered arenas.
+        phase = index * 3 // episodes
+        if phase == 0:
+            case = open_cases[index]
+            env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
+        elif phase == 1:
+            case = occluded_cases[index]
+            env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
+        else:
+            env = FlyCarEnv(SIM, DRIVE, seed=run_seed + index, scenario=None, render=True)
         reward_model = ExplorationReward()
         reward_model.reset(env.car_pose()[:2])
         total = 0.0
@@ -92,5 +105,6 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         agent.epsilon = max(0.04, epsilon * (1.0 - (index + 1) / (episodes * 1.15)))
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    agent.training_runs += 1
     agent.save(output)
     return TrainingSummary(episodes, successes, sum(rewards) / episodes, sum(cells) / episodes)
