@@ -214,7 +214,14 @@ class FlyCarEnv:
             timestamp=self.sim_steps * self.drive.timestep,
             contact_left=self._contact_left,
             contact_right=self._contact_right,
+            speed=self.speed if self.sim_cfg.kinematic else encoder_delta / self.drive.timestep,
+            range_left=self._range_reading(self.adr_b_fl),
+            range_right=self._range_reading(self.adr_b_fr),
         )
+
+    def _range_reading(self, address):
+        value = float(self.d.sensordata[address])
+        return value if 0.0 < value < 1.2 else 1.2
 
     def apply(self, command: ActuatorCommand) -> None:
         self.step(command.traction, command.steering, observe=False)
@@ -242,7 +249,8 @@ class FlyCarEnv:
         self._record_contact(hit)
         self._contact_left, self._contact_right = hit and side > 0, hit and side < 0
         if hit:
-            candidate = self._slide_along_collision(before, candidate)
+            # Stop the blocked bicycle motion; never invent lateral movement.
+            candidate = BicycleState(before.x, before.y, before.yaw, 0.0, 0.0)
         self.state = candidate
         self.speed = candidate.speed
         self.heading = candidate.yaw
@@ -290,6 +298,19 @@ class FlyCarEnv:
                 yaw=before.yaw + (after.yaw - before.yaw) * fraction,
             )
             if self._pose_collides(state):
+                rear = self.drive.wheel_radius + .005
+                front = self.drive.wheelbase + self.drive.wheel_radius + .005
+                width = self.drive.track / 2 + .022
+                c, s = math.cos(state.yaw), math.sin(state.yaw)
+                corners = [(state.x + c*x-s*y, state.y+s*x+c*y)
+                           for x in (-rear, front) for y in (-width, width)]
+                limit = self.sim_cfg.arena_half
+                wall = next(((x, y) for x, y in corners if abs(x)>limit or abs(y)>limit), None)
+                if wall is not None:
+                    x, y = wall
+                    dx, dy = ((math.copysign(1, x), 0) if abs(x)>limit else (0, math.copysign(1, y)))
+                    lateral = -s*dx+c*dy
+                    return True, lateral
                 nearest = min(self.obstacles, key=lambda item: math.hypot(state.x - item[0][0], state.y - item[0][1]), default=None)
                 if nearest is None:
                     return True, 1.0 if state.y >= 0 else -1.0
@@ -297,67 +318,6 @@ class FlyCarEnv:
                 lateral = -math.sin(state.yaw) * dx + math.cos(state.yaw) * dy
                 return True, lateral if lateral else 1.0
         return False, 0.0
-
-    def _slide_along_collision(self, before: BicycleState, candidate: BicycleState) -> BicycleState:
-        """Resolve a kinematic impact by using the steering-induced tangent.
-
-        The car's collision envelope remains deliberately conservative.  On
-        impact it may move only sideways around the contacted circle/wall; it
-        can never advance through it.  This prevents the bicycle model from
-        being frozen with zero speed while it is trying to steer away.
-        """
-        travel = math.hypot(candidate.x - before.x, candidate.y - before.y)
-        turn_sign = 1.0 if candidate.yaw_rate > 1e-9 else -1.0 if candidate.yaw_rate < -1e-9 else 0.0
-        if travel <= 1e-9 or turn_sign == 0.0:
-            return BicycleState(before.x, before.y, candidate.yaw, 0.0, candidate.yaw_rate)
-
-        nearest = min(
-            self.obstacles,
-            key=lambda item: math.hypot(before.x - item[0][0], before.y - item[0][1]),
-            default=None,
-        )
-        if nearest is not None:
-            ox, oy = nearest[0]
-            radial_x, radial_y = before.x - ox, before.y - oy
-            radial_length = math.hypot(radial_x, radial_y)
-        else:
-            radial_x = radial_y = radial_length = 0.0
-
-        if radial_length > 1e-9:
-            # Positive bicycle yaw turns left.  At the obstacle's left side
-            # that is the +Y tangent, i.e. clockwise around the obstacle.
-            tangent_x = turn_sign * radial_y / radial_length
-            tangent_y = -turn_sign * radial_x / radial_length
-        else:
-            # A wall collision: steer along the wall, not into it.
-            limit = self.sim_cfg.arena_half - self.drive.collision_radius
-            if abs(before.x) >= abs(before.y) and abs(before.x) >= limit - travel:
-                tangent_x, tangent_y = 0.0, turn_sign
-            else:
-                tangent_x, tangent_y = turn_sign, 0.0
-
-        def slide_state(fraction: float) -> BicycleState:
-            return BicycleState(
-                before.x + tangent_x * travel * fraction,
-                before.y + tangent_y * travel * fraction,
-                candidate.yaw,
-                candidate.speed * fraction,
-                candidate.yaw_rate,
-            )
-
-        if not self._motion_collides(before, slide_state(1.0))[0]:
-            return slide_state(1.0)
-
-        # Another wall/obstacle can limit the tangent too.  Keep the largest
-        # safe portion of the slide rather than freezing the vehicle again.
-        low, high = 0.0, 1.0
-        for _ in range(12):
-            middle = (low + high) / 2.0
-            if self._motion_collides(before, slide_state(middle))[0]:
-                high = middle
-            else:
-                low = middle
-        return slide_state(low)
 
     def _record_contact(self, colliding: bool):
         if colliding and not self._contact_active:

@@ -17,6 +17,9 @@ class SensorFrame:
     timestamp: float
     contact_left: bool = False
     contact_right: bool = False
+    speed: float = 0.0
+    range_left: float = 1.2
+    range_right: float = 1.2
 
 
 @dataclass(frozen=True)

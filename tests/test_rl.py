@@ -1,15 +1,58 @@
 import unittest
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
+from dataclasses import replace
 
-from fly_brain_rc.rl import ExplorationReward, QLearningAgent, QLearningBrain
+from fly_brain_rc.rl import ExplorationReward, QLearningAgent, QLearningBrain, observation_state
 from fly_brain_rc.rl_training import observation_state
 from fly_brain_rc.rl_training import load_training_agent
+from fly_brain_rc.rl_training import train_q_learning
+from tests.test_environment import HeadlessRenderer
+from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.contracts import ObjectObservation, SensorFrame
 import numpy as np
 
 
 class ReinforcementLearningTests(unittest.TestCase):
+    def test_training_reads_once_per_tick_and_learns_forward_states(self):
+        instances = []
+        def make_env(*args, **kwargs):
+            env = FlyCarEnv(*args, **kwargs)
+            env.sensor_frame = unittest.mock.Mock(wraps=env.sensor_frame)
+            instances.append(env)
+            return env
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('fly_brain_rc.sim.env.mujoco.Renderer', HeadlessRenderer), \
+             patch('fly_brain_rc.rl_training.FlyCarEnv', side_effect=make_env), \
+             patch.object(QLearningAgent, 'choose', return_value=0):
+            path = Path(directory) / 'policy.json'
+            train_q_learning(episodes=1, steps=20, output=path)
+            learner = QLearningAgent.load(path)
+            self.assertEqual(instances[0].sensor_frame.call_count, 21)
+            self.assertTrue(any('forward' in state for state in learner.table))
+
+    def test_policy_holds_action_despite_changed_observation_until_point_two_seconds(self):
+        learner = QLearningAgent(actions=((.3, -.6), (.3, .6)), epsilon=0)
+        sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2), dtype=np.uint8),
+                             0, 0, .8, False, 0)
+        other = replace(sensor, tof=.1, timestamp=.02)
+        learner.table[observation_state(sensor, None, None)] = [2, 0]
+        learner.table[observation_state(other, None, None)] = [0, 2]
+        brain = QLearningBrain(learner)
+        self.assertLess(brain.step(sensor, None, None, 0, .02)[0].steering, 0)
+        self.assertLess(brain.step(other, None, None, 0, .02)[0].steering, 0)
+        self.assertGreater(brain.step(replace(other, timestamp=.2), None, None, 0, .02)[0].steering, 0)
+
+    def test_old_table_is_preserved_when_observation_schema_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'policy.json'
+            original = '{"version": 2, "table": {"old": [42]}}'
+            path.write_text(original)
+            agent = load_training_agent(path, seed=0, epsilon=.25)
+            self.assertEqual(agent.table, {})
+            self.assertEqual(path.with_name('policy.json.v2.bak').read_text(), original)
+
     def test_new_cell_is_rewarded_and_stationary_streak_is_penalized(self):
         reward = ExplorationReward(cell_size=0.5)
         reward.reset((0.0, 0.0))
@@ -73,7 +116,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         state = observation_state(sensor, target, obstacle=None)
 
-        self.assertEqual(state, ("target_right", "clear", "far", "moving", "no_contact"))
+        self.assertEqual(state, ("target_right", "clear", "small", "clear", "clear", "clear", "stalled", "no_contact"))
 
     def test_policy_state_distinguishes_the_side_that_needs_an_escape_turn(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
@@ -85,10 +128,10 @@ class ReinforcementLearningTests(unittest.TestCase):
 
     def test_frozen_policy_turns_the_action_with_highest_learned_value_into_motor_command(self):
         agent = QLearningAgent(actions=((0.7, -0.4), (0.7, 0.4)), epsilon=0.0)
-        state = ("target_none", "clear", "far", "stalled", "no_contact")
-        agent.table[state] = [0.1, 2.0]
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
                              0.0, 0.0, 0.8, False, 0.0)
+        state = observation_state(sensor, None, None)
+        agent.table[state] = [0.1, 2.0]
 
         command, telemetry = QLearningBrain(agent).step(sensor, None, None, 0.0, 0.02, obstacle=None)
 

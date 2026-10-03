@@ -65,6 +65,13 @@ class EnvironmentGeometryTests(unittest.TestCase):
         self.assertFalse(env._pose_collides(after))
         self.assertTrue(env._motion_collides(before, after)[0])
 
+    def test_wall_contact_side_does_not_come_from_a_distant_cylinder(self):
+        env = self.make_env()
+        env.obstacles = [((0.0, -1.0), (1.0, 0.0, 0.0))]
+        hit, side = env._motion_collides(BicycleState(0, 2.7, 0), BicycleState(0, 2.9, 0))
+        self.assertTrue(hit)
+        self.assertGreater(side, 0)
+
     def test_contact_count_only_changes_on_contact_edge(self):
         env = self.make_env()
         env.collisions = 0
@@ -121,7 +128,7 @@ class EnvironmentIntegrationTests(unittest.TestCase):
         self.assertLess(self.env.state.x, 0.0)
         self.assertFalse(self.env._contact_active)
 
-    def test_blocked_drive_keeps_the_steering_turn_for_escape(self):
+    def test_blocked_drive_does_not_rotate_through_obstacle(self):
         self.env.obstacles = [((0.6, 0.0), (0.2, 0.5, 0.8))]
         self.env.drive.max_speed = 5.0
         self.env.drive.linear_accel = 100.0
@@ -130,9 +137,9 @@ class EnvironmentIntegrationTests(unittest.TestCase):
 
         self.assertTrue(self.env._contact_active)
         self.assertAlmostEqual(self.env.state.x, 0.0)
-        self.assertGreater(self.env.state.yaw, 0.0)
+        self.assertEqual(self.env.state.yaw, 0.0)
 
-    def test_blocked_steering_drive_slides_along_the_obstacle(self):
+    def test_blocked_steering_drive_does_not_invent_sideways_motion(self):
         self.env.obstacles = [((0.6, 0.0), (0.2, 0.5, 0.8))]
         self.env.drive.max_speed = 5.0
         self.env.drive.linear_accel = 100.0
@@ -140,7 +147,7 @@ class EnvironmentIntegrationTests(unittest.TestCase):
         self.env.step_kinematic(1.0, 1.0, 0.1)
 
         self.assertTrue(self.env._contact_active)
-        self.assertGreater(self.env.state.y, 0.0)
+        self.assertEqual(self.env.state.y, 0.0)
         self.assertFalse(self.env._pose_collides(self.env.state))
 
     def test_rendered_sensor_frame_has_only_embodied_readings(self):

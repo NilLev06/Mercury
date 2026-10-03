@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import json
+import shutil
 
 from .config import DRIVE, SIM
 from .contracts import ActuatorCommand, BrainTelemetry, MotionObservation, RuntimeTelemetry
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
-from .rl import ExplorationReward, QLearningAgent, observation_state
+from .rl import ACTION_DURATION, POLICY_VERSION, ExplorationReward, QLearningAgent, observation_state
 from .sim.env import FlyCarEnv
 from .sim.suites import training_cases
 
@@ -23,6 +25,16 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
     """Resume the persisted policy when it exists; otherwise create its seed."""
     output = Path(output)
     if output.exists():
+        version = json.loads(output.read_text()).get('version')
+        if version != POLICY_VERSION:
+            backup = output.with_name(output.name + f'.v{version}.bak')
+            index = 1
+            while backup.exists():
+                backup = output.with_name(output.name + f'.v{version}.{index}.bak')
+                index += 1
+            shutil.copy2(output, backup)
+            print(f'Old policy preserved: {backup}. Starting new observation schema.', flush=True)
+            return QLearningAgent(epsilon=epsilon, seed=seed)
         return QLearningAgent.load(output, epsilon=epsilon, seed=seed)
     return QLearningAgent(epsilon=epsilon, seed=seed)
 
@@ -56,12 +68,18 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         reward_model.reset(env.car_pose()[:2])
         total = 0.0
         try:
+            sensor = env.sensor_frame()
+            state = observation_state(sensor, target_detector.detect(sensor, 'red_ball'),
+                                      obstacle_detector.detect(sensor, 'obstacle'))
+            remaining = 0
+            window_reward = 0.0
+            reverse_time = 0.0
             for sequence in range(1, steps + 1):
-                sensor = env.sensor_frame()
-                target = target_detector.detect(sensor, "red_ball")
-                obstacle = obstacle_detector.detect(sensor, "obstacle")
-                state = observation_state(sensor, target, obstacle)
-                action = agent.choose(state)
+                if remaining == 0:
+                    action = agent.choose(state)
+                    window_state = state
+                    window_reward = 0.0
+                    remaining = max(1, round(ACTION_DURATION / env.drive.timestep))
                 traction, steering = agent.actions[action]
                 env.apply(ActuatorCommand(traction, steering, sensor.timestamp, sequence))
 
@@ -74,7 +92,14 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
                                            contact=next_sensor.contact, reached=reached,
                                            target=next_target)
-                agent.update(state, action, reward, next_state, terminal=reached)
+                reverse_time = reverse_time + env.drive.timestep if next_sensor.speed < -.025 else 0.0
+                if reverse_time > .6:
+                    reward -= .04 * env.drive.timestep
+                window_reward += reward
+                remaining -= 1
+                if remaining == 0 or reached or sequence == steps:
+                    agent.update(window_state, action, window_reward, next_state, terminal=reached)
+                sensor, state = next_sensor, next_state
                 total += reward
                 if emit is not None:
                     telemetry = BrainTelemetry(

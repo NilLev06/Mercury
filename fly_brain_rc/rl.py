@@ -15,9 +15,12 @@ from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, Senso
 
 
 DEFAULT_ACTIONS = (
+    (0.30, -0.65), (0.30, 0.0), (0.30, 0.65),
     (0.70, -0.75), (0.70, -0.35), (0.70, 0.0), (0.70, 0.35), (0.70, 0.75),
     (-0.70, -0.80), (-0.70, 0.0), (-0.70, 0.80),
 )
+ACTION_DURATION = 0.2
+POLICY_VERSION = 4
 
 
 def _bearing(label: str, observation: ObjectObservation | None) -> str:
@@ -34,11 +37,15 @@ def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
                       obstacle: ObjectObservation | None) -> tuple[str, ...]:
     """Compact policy state containing only camera and embodied readings."""
     obstacle_state = "clear" if obstacle is None else _bearing("obstacle", obstacle)
-    distance = "near" if sensor.tof < 0.42 else "far"
-    movement = "moving" if abs(sensor.encoder_delta) >= 0.001 else "stalled"
+    def range_bin(value):
+        return "blocked" if value < .25 else "near" if value < .60 else "clear"
+    distance = range_bin(sensor.tof)
+    movement = "reverse" if sensor.speed < -.025 else "forward" if sensor.speed > .025 else "stalled"
     contact = ("contact_left" if sensor.contact_left else "contact_right" if sensor.contact_right
                else "contact_center" if sensor.contact else "no_contact")
-    return (_bearing("target", target), obstacle_state, distance, movement, contact)
+    obstacle_size = "large" if obstacle is not None and obstacle.apparent_area >= .08 else "small"
+    return (_bearing("target", target), obstacle_state, obstacle_size,
+            range_bin(sensor.range_left), distance, range_bin(sensor.range_right), movement, contact)
 
 
 class ExplorationReward:
@@ -105,7 +112,7 @@ class ExplorationReward:
 class QLearningAgent:
     actions: tuple[tuple[float, float], ...] = DEFAULT_ACTIONS
     alpha: float = 0.18
-    gamma: float = 0.92
+    gamma: float = 0.98
     epsilon: float = 0.20
     seed: int = 0
 
@@ -139,7 +146,7 @@ class QLearningAgent:
 
     def save(self, path: str | Path) -> None:
         payload = {
-            "version": 2, "actions": self.actions, "alpha": self.alpha,
+            "version": POLICY_VERSION, "actions": self.actions, "alpha": self.alpha,
             "gamma": self.gamma, "epsilon": self.epsilon,
             "training_runs": self.training_runs,
             "table": {"|".join(state): values for state, values in self.table.items()},
@@ -149,7 +156,7 @@ class QLearningAgent:
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0, seed: int = 0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
-        if payload.get("version") != 2:
+        if payload.get("version") != POLICY_VERSION:
             raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
                     alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon, seed=seed)
@@ -165,11 +172,19 @@ class QLearningBrain:
 
     def __init__(self, agent: QLearningAgent):
         self.agent = agent
+        self.reset()
+
+    def reset(self):
+        self._action = None
+        self._until = -float('inf')
 
     def step(self, sensor: SensorFrame, target: ObjectObservation | None, motion,
              familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
         state = observation_state(sensor, target, obstacle)
-        action = self.agent.choose(state, explore=False)
+        if self._action is None or sensor.timestamp >= self._until - 1e-9:
+            self._action = self.agent.choose(state, explore=False)
+            self._until = sensor.timestamp + ACTION_DURATION
+        action = self._action
         traction, steering = self.agent.actions[action]
         value = self.agent.value(state, action)
         command = ActuatorCommand(traction, steering, sensor.timestamp, 0)
