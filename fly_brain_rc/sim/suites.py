@@ -10,6 +10,22 @@ class SuiteCase:
     identifier: str
     seed: int
     scenario: Scenario
+    start_pose: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+def recovery_cases(seed, count):
+    """Near-contact starts, alternating front/rear cylinder and wall."""
+    if type(count) is not int or count < 0:
+        raise ValueError('count must be nonnegative')
+    layouts = (
+        ('recover_front_cylinder', (((.51, 0), BLUE),), (-1.8, .6), (0,0,0)),
+        ('recover_rear_cylinder', (((-.33, 0), BLUE),), (1.8, .6), (0,0,0)),
+        ('recover_front_wall', (), (0,.6), (2.77,0,0)),
+        ('recover_rear_wall', (), (0,.6), (-2.95,0,0)),
+    )
+    return tuple(SuiteCase(f'{layouts[i%4][0]}-{seed}-{i}', seed+i,
+                           Scenario(f'{layouts[i%4][0]}-{seed}-{i}', layouts[i%4][1], layouts[i%4][2]),
+                           layouts[i%4][3]) for i in range(count))
 
 
 def training_cases(seed, count, *, occluded=False):

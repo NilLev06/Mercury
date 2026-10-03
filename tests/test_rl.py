@@ -15,6 +15,76 @@ import numpy as np
 
 
 class ReinforcementLearningTests(unittest.TestCase):
+    def test_recovery_memory_survives_brief_contact_release(self):
+        from fly_brain_rc.rl import RLController
+        agent = QLearningAgent()
+        controller = RLController(agent)
+        sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)), 0,0,1.2,False,0)
+        controller.observe(sensor, None, None)
+        controller.action = 5
+        controller.observe(replace(sensor, timestamp=.02, contact=True, contact_front=True), None, None)
+        state = controller.observe(replace(sensor, timestamp=.22, encoder_delta=.015), None, None)
+        self.assertEqual(state[10], 'forward_failed')
+        self.assertLess(agent.actions[controller.choose(state, explore=False)][0], 0)
+
+    def test_bootstrap_ignores_direction_blocked_by_bumper(self):
+        agent = QLearningAgent(alpha=1, gamma=.5, actions=((.3,0),(-.7,0)))
+        next_state = ('target_none','clear','small','clear','clear','clear','stalled','contact_center',
+                      'contact_front','none','none','none')
+        agent.table[next_state] = [100,-10]
+        agent.update(('prior',), 0, 0, next_state, terminal=False)
+        self.assertEqual(agent.value(('prior',),0), -5)
+
+    def test_contact_classification_uses_colliding_not_nearest_obstacle(self):
+        from fly_brain_rc.sim.scenarios import Scenario, BLUE
+        from fly_brain_rc.sim.kinematics import BicycleState
+        from fly_brain_rc.config import SIM, DRIVE
+        env = FlyCarEnv(SIM, DRIVE, scenario=Scenario('two', (((.5005,0),BLUE), ((-.322,0),BLUE)), (2,0)), render=False)
+        hit, _ = env._motion_collides(BicycleState(0,0,0), BicycleState(.001,0,0))
+        self.assertTrue(hit)
+        self.assertGreater(env._collision_longitudinal, 0)
+
+    def test_unknown_frozen_choices_are_deterministic_and_forward(self):
+        sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)), 0, 0, 1.2, False, 0)
+        commands = [QLearningBrain(QLearningAgent(seed=i)).step(sensor, None, None, 0, .02)[0]
+                    for i in range(20)]
+        self.assertEqual(len({(c.traction, c.steering) for c in commands}), 1)
+        self.assertGreater(commands[0].traction, 0)
+
+    def test_repeated_blocked_reverse_is_replaced_by_forward(self):
+        sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)),
+                             0, 0, 1.2, True, 0, contact_right=True)
+        learner = QLearningAgent()
+        learner.table[observation_state(sensor, None, None)] = [0]*8 + [10, 0, 0]
+        brain = QLearningBrain(learner)
+        first = brain.step(sensor, None, None, 0, .02)[0]
+        self.assertLess(first.traction, 0)
+        for tick in range(1, 21):
+            command = brain.step(replace(sensor, timestamp=tick*.02), None, None, 0, .02)[0]
+        self.assertGreater(command.traction, 0)
+
+    def test_rear_contact_does_not_repeat_failed_forward_turn(self):
+        sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)),
+                             0, 0, 1.2, True, 0, contact_right=True, contact_rear=True)
+        agent = QLearningAgent()
+        state = observation_state(sensor, None, None, previous='forward_right', failed='forward_failed', blocked_action=2)
+        agent.table[state] = [0, 0, 99, 0, 0, 0, 0, 100, 0, 0, 0]
+        action = agent.choose(state, explore=False)
+        self.assertGreater(agent.actions[action][0], 0)
+        self.assertLessEqual(agent.actions[action][1], .1)
+
+    def test_front_and_rear_contacts_have_different_policy_states(self):
+        from fly_brain_rc.sim.scenarios import Scenario, BLUE
+        from fly_brain_rc.sim.kinematics import BicycleState
+        from fly_brain_rc.config import SIM, DRIVE
+        states = []
+        for x, throttle in [(0, 1), (.84, -1)]:
+            env = FlyCarEnv(SIM, DRIVE, scenario=Scenario('bumper', (((.5,0), BLUE),), (2,0)), render=False)
+            env.state = BicycleState(x,0,0,0)
+            for _ in range(30): env.step_kinematic(throttle, 0, .02)
+            states.append((getattr(env, '_contact_front', False), getattr(env, '_contact_rear', False)))
+        self.assertEqual(states, [(True, False), (False, True)])
+
     def test_training_reads_once_per_tick_and_learns_forward_states(self):
         instances = []
         def make_env(*args, **kwargs):
@@ -140,7 +210,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         state = observation_state(sensor, target, obstacle=None)
 
-        self.assertEqual(state, ("target_right", "clear", "small", "clear", "clear", "clear", "stalled", "no_contact"))
+        self.assertEqual(state, ("target_right", "clear", "small", "clear", "clear", "clear", "stalled", "no_contact", "no_contact", "none", "none", "none"))
 
     def test_policy_state_distinguishes_the_side_that_needs_an_escape_turn(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),
@@ -148,7 +218,26 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         state = observation_state(sensor, target=None, obstacle=None)
 
-        self.assertEqual(state[-1], "contact_left")
+        self.assertEqual(state[7], "contact_left")
+
+    def test_recovery_curriculum_includes_walls_and_both_contact_directions(self):
+        from fly_brain_rc.sim import suites
+        cases = suites.recovery_cases(0, 4)
+        self.assertEqual(len(cases), 4)
+        self.assertEqual([c.scenario.name.split('-')[0] for c in cases],
+                         ['recover_front_cylinder', 'recover_rear_cylinder', 'recover_front_wall', 'recover_rear_wall'])
+        self.assertGreater(cases[2].start_pose[0], 2.7)
+        self.assertLess(cases[3].start_pose[0], -2.9)
+
+    def test_v4_training_starts_new_table_and_preserves_bytes(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'policy.json'
+            old = json.dumps(dict(version=4, table={'old': [9]}))
+            path.write_text(old)
+            learner = load_training_agent(path, seed=0, epsilon=.25)
+            self.assertEqual(learner.table, {})
+            self.assertEqual(path.with_name('policy.json.v4.bak').read_text(), old)
 
     def test_frozen_policy_turns_the_action_with_highest_learned_value_into_motor_command(self):
         agent = QLearningAgent(actions=((0.7, -0.4), (0.7, 0.4)), epsilon=0.0)

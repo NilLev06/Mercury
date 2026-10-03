@@ -9,9 +9,10 @@ import shutil
 from .config import DRIVE, SIM
 from .contracts import ActuatorCommand, BrainTelemetry, MotionObservation, RuntimeTelemetry
 from .perception.target import MockBlueObstacleDetector, MockRedBallDetector
-from .rl import ACTION_DURATION, POLICY_VERSION, ExplorationReward, QLearningAgent, observation_state
+from .rl import ACTION_DURATION, POLICY_VERSION, ExplorationReward, QLearningAgent, RLController, observation_state
 from .sim.env import FlyCarEnv
-from .sim.suites import training_cases
+from .sim.suites import training_cases, recovery_cases
+from .sim.kinematics import BicycleState
 
 @dataclass(frozen=True)
 class TrainingSummary:
@@ -57,32 +58,40 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
     rewards, cells, successes = [], [], 0
     open_cases = training_cases(run_seed, episodes)
     occluded_cases = training_cases(run_seed + 1, episodes, occluded=True)
+    recover_cases = recovery_cases(run_seed, episodes)
 
     for index in range(episodes):
         # Every launch expands the map experience.  Within a launch, advance
-        # from direct pursuit to one occluder and finally cluttered arenas.
-        phase = index * 3 // episodes
+        # from near-contact recovery to pursuit, one occluder and clutter.
+        phase = index * 4 // episodes
         if phase == 0:
+            case = recover_cases[index]
+            env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
+            env.state = BicycleState(*case.start_pose, 0.0)
+            env.start_pose = case.start_pose
+            env._sync_kinematic()
+        elif phase == 1:
             case = open_cases[index]
             env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
-        elif phase == 1:
+        elif phase == 2:
             case = occluded_cases[index]
             env = FlyCarEnv(SIM, DRIVE, seed=case.seed, scenario=case.scenario, render=True)
         else:
             env = FlyCarEnv(SIM, DRIVE, seed=run_seed + index, scenario=None, render=True)
         reward_model = ExplorationReward()
+        controller = RLController(agent)
         reward_model.reset(env.car_pose()[:2])
         total = 0.0
         contact_seconds = reverse_seconds = reverse_distance = stalled_seconds = 0.0
         try:
             sensor = env.sensor_frame()
-            state = observation_state(sensor, target_detector.detect(sensor, 'red_ball'),
+            state = controller.observe(sensor, target_detector.detect(sensor, 'red_ball'),
                                       obstacle_detector.detect(sensor, 'obstacle'))
             remaining = 0
             window_reward = 0.0
             for sequence in range(1, steps + 1):
                 if remaining == 0:
-                    action = agent.choose(state)
+                    action = controller.choose(state, explore=True)
                     window_state = state
                     window_reward = 0.0
                     remaining = max(1, round(ACTION_DURATION / env.drive.timestep))
@@ -92,7 +101,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 next_sensor = env.sensor_frame()
                 next_target = target_detector.detect(next_sensor, "red_ball")
                 next_obstacle = obstacle_detector.detect(next_sensor, "obstacle")
-                next_state = observation_state(next_sensor, next_target, next_obstacle)
+                next_state = controller.observe(next_sensor, next_target, next_obstacle)
                 reached = env.goal_distance() <= env.sim_cfg.goal_radius
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
@@ -134,8 +143,8 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 env.renderer.close()
         rewards.append(total)
         cells.append(len(reward_model.visited))
-        report = dict(run=run_number, episode=index + 1, phase=('open', 'occluded', 'clutter')[phase],
-                      seed=case.seed if phase < 2 else run_seed + index,
+        report = dict(policy_version=POLICY_VERSION, run=run_number, episode=index + 1, phase=('recovery', 'open', 'occluded', 'clutter')[phase],
+                      seed=case.seed if phase < 3 else run_seed + index,
                       success=bool(reached), steps=sequence,
                       duration=sequence * env.drive.timestep, reward=total,
                       explored_cells=len(reward_model.visited), contacts=env.collisions,

@@ -90,6 +90,7 @@ class FlyCarEnv:
         self._w_cmd_prev = 0.0
         self._contact_active = False
         self._contact_left = self._contact_right = False
+        self._contact_front = self._contact_rear = False
         for i in range(self.m.nq):
             self.d.qpos[i] = 0.0
         self.d.qpos[2] = 0.05
@@ -217,6 +218,8 @@ class FlyCarEnv:
             speed=self.speed if self.sim_cfg.kinematic else encoder_delta / self.drive.timestep,
             range_left=self._range_reading(self.adr_b_fl),
             range_right=self._range_reading(self.adr_b_fr),
+            contact_front=self._contact_front,
+            contact_rear=self._contact_rear,
         )
 
     def _range_reading(self, address):
@@ -246,6 +249,8 @@ class FlyCarEnv:
         before = self.state
         candidate = step_bicycle(before, throttle, steer, self.drive, dt)
         hit, side = self._motion_collides(before, candidate)
+        self._contact_front = hit and self._collision_longitudinal >= 0
+        self._contact_rear = hit and self._collision_longitudinal < 0
         self._record_contact(hit)
         self._contact_left, self._contact_right = hit and side > 0, hit and side < 0
         if hit:
@@ -276,18 +281,22 @@ class FlyCarEnv:
         )
         if any(abs(x) > self.sim_cfg.arena_half or abs(y) > self.sim_cfg.arena_half for x, y in corners):
             return True
-        for (ox, oy), _ in self.obstacles:
-            # Circle-vs-oriented-rectangle collision in vehicle coordinates.
-            dx, dy = ox - state.x, oy - state.y
-            local_x = cos_yaw * dx + sin_yaw * dy
-            local_y = -sin_yaw * dx + cos_yaw * dy
-            nearest_x = min(front, max(-rear, local_x))
-            nearest_y = min(half_width, max(-half_width, local_y))
-            if math.hypot(local_x - nearest_x, local_y - nearest_y) < self.sim_cfg.obstacle_radius:
+        for point, _ in self.obstacles:
+            if self._obstacle_collides(state, point):
                 return True
         return False
 
+    def _obstacle_collides(self, state, point):
+        rear = self.drive.wheel_radius + .005
+        front = self.drive.wheelbase + self.drive.wheel_radius + .005
+        width = self.drive.track / 2 + .022
+        c, s = math.cos(state.yaw), math.sin(state.yaw)
+        dx, dy = point[0]-state.x, point[1]-state.y
+        x, y = c*dx+s*dy, -s*dx+c*dy
+        return math.hypot(x-min(front,max(-rear,x)), y-min(width,max(-width,y))) < self.sim_cfg.obstacle_radius
+
     def _motion_collides(self, before: BicycleState, after: BicycleState) -> tuple[bool, float]:
+        self._collision_longitudinal = 0.0
         distance = math.hypot(after.x - before.x, after.y - before.y)
         samples = max(1, math.ceil(distance / max(self.drive.collision_radius * 0.5, 1e-6)))
         for index in range(1, samples + 1):
@@ -310,11 +319,14 @@ class FlyCarEnv:
                     x, y = wall
                     dx, dy = ((math.copysign(1, x), 0) if abs(x)>limit else (0, math.copysign(1, y)))
                     lateral = -s*dx+c*dy
+                    self._collision_longitudinal = c*dx+s*dy
                     return True, lateral
-                nearest = min(self.obstacles, key=lambda item: math.hypot(state.x - item[0][0], state.y - item[0][1]), default=None)
+                nearest = min((item for item in self.obstacles if self._obstacle_collides(state,item[0])),
+                              key=lambda item: math.hypot(state.x - item[0][0], state.y - item[0][1]), default=None)
                 if nearest is None:
                     return True, 1.0 if state.y >= 0 else -1.0
                 dx, dy = nearest[0][0] - state.x, nearest[0][1] - state.y
+                self._collision_longitudinal = math.cos(state.yaw)*dx + math.sin(state.yaw)*dy - self.drive.wheelbase/2
                 lateral = -math.sin(state.yaw) * dx + math.cos(state.yaw) * dy
                 return True, lateral if lateral else 1.0
         return False, 0.0

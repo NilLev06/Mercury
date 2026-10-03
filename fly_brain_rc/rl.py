@@ -20,7 +20,7 @@ DEFAULT_ACTIONS = (
     (-0.70, -0.80), (-0.70, 0.0), (-0.70, 0.80),
 )
 ACTION_DURATION = 0.2
-POLICY_VERSION = 4
+POLICY_VERSION = 5
 
 
 def _bearing(label: str, observation: ObjectObservation | None) -> str:
@@ -34,7 +34,8 @@ def _bearing(label: str, observation: ObjectObservation | None) -> str:
 
 
 def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
-                      obstacle: ObjectObservation | None) -> tuple[str, ...]:
+                      obstacle: ObjectObservation | None, *, previous: str = 'none',
+                      failed: str = 'none', blocked_action: int | None = None) -> tuple[str, ...]:
     """Compact policy state containing only camera and embodied readings."""
     obstacle_state = "clear" if obstacle is None else _bearing("obstacle", obstacle)
     def range_bin(value):
@@ -44,8 +45,11 @@ def observation_state(sensor: SensorFrame, target: ObjectObservation | None,
     contact = ("contact_left" if sensor.contact_left else "contact_right" if sensor.contact_right
                else "contact_center" if sensor.contact else "no_contact")
     obstacle_size = "large" if obstacle is not None and obstacle.apparent_area >= .08 else "small"
+    longitudinal = ('contact_front' if sensor.contact_front else 'contact_rear' if sensor.contact_rear
+                    else 'contact_unknown' if sensor.contact else 'no_contact')
     return (_bearing("target", target), obstacle_state, obstacle_size,
-            range_bin(sensor.range_left), distance, range_bin(sensor.range_right), movement, contact)
+            range_bin(sensor.range_left), distance, range_bin(sensor.range_right), movement, contact,
+            longitudinal, previous, failed, 'none' if blocked_action is None else str(blocked_action))
 
 
 class ExplorationReward:
@@ -122,6 +126,10 @@ class QLearningAgent:
         self._rng = random.Random(self.seed)
         self.table: dict[tuple[str, ...], list[float]] = {}
         self.training_runs = 0
+        self.legacy_inference = False
+
+    def values(self, state):
+        return self.table.get(tuple(state[:8] if self.legacy_inference else state), [0.0] * len(self.actions))
 
     def _values(self, state: tuple[str, ...]) -> list[float]:
         return self.table.setdefault(tuple(state), [0.0] * len(self.actions))
@@ -129,18 +137,51 @@ class QLearningAgent:
     def value(self, state: tuple[str, ...], action: int) -> float:
         return self._values(state)[action]
 
+    def admissible_actions(self, state):
+        # Geometry contacts act as directional bumpers; failed travel also stays
+        # inhibited until encoder progress, even after a contact flickers off.
+        failed = state[10] if len(state) > 10 else 'none'
+        bumper = state[8] if len(state) > 8 else 'no_contact'
+        blocked_action = int(state[11]) if len(state) > 11 and state[11] != 'none' else None
+        admissible = [i for i,(t,_) in enumerate(self.actions)
+                      if not (t > 0 and (bumper == 'contact_front' or failed == 'forward_failed'))
+                      and not (t < 0 and (bumper == 'contact_rear' or failed == 'reverse_failed'))]
+        if not admissible:
+            # Conflicting stale failure and current bumper: the bumper wins.
+            permitted = [i for i,(t,_) in enumerate(self.actions)
+                         if (t <= 0 if bumper == 'contact_front' else t >= 0)]
+            def turn_category(steer):
+                return -1 if steer < -.1 else 1 if steer > .1 else 0
+            blocked_turn = None if blocked_action is None else turn_category(self.actions[blocked_action][1])
+            admissible = [i for i in permitted if turn_category(self.actions[i][1]) != blocked_turn]
+            admissible = admissible or permitted or list(range(len(self.actions)))
+        return admissible
+
     def choose(self, state: tuple[str, ...], *, explore: bool = True) -> int:
+        admissible = self.admissible_actions(state)
+        failed = state[10] if len(state) > 10 else 'none'
+        bumper = state[8] if len(state) > 8 else 'no_contact'
         if explore and self._rng.random() < self.epsilon:
-            return self._rng.randrange(len(self.actions))
-        values = self._values(state)
-        best = max(values)
-        candidates = [index for index, value in enumerate(values) if value == best]
-        return self._rng.choice(candidates)
+            return self._rng.choice(admissible)
+        values = self.values(state)
+        best = max(values[i] for i in admissible)
+        candidates = [i for i in admissible if values[i] == best]
+        # Deterministic, low-speed fallback toward a visible target or a free
+        # side. With no target, keep a gentle search turn, not blind reversing.
+        steer = -0.65 if state[0] == 'target_left' else .65 if state[0] == 'target_right' else 0.0
+        if state[4] == 'blocked' or state[1] == 'obstacle_center':
+            rank = {'blocked': 0, 'near': 1, 'clear': 2}
+            steer = -.65 if rank[state[3]] > rank[state[5]] else .65
+        elif state[0] == 'target_none':
+            steer = -.65 if state[1] == 'obstacle_right' else .65
+        preferred_traction = -.7 if bumper == 'contact_front' or failed == 'forward_failed' else .3
+        return min(candidates, key=lambda i: (abs(self.actions[i][0]-preferred_traction),
+                                             abs(self.actions[i][1]-steer), i))
 
     def update(self, state: tuple[str, ...], action: int, reward: float,
                next_state: tuple[str, ...], *, terminal: bool) -> None:
         values = self._values(state)
-        future = 0.0 if terminal else max(self._values(next_state))
+        future = 0.0 if terminal else max(self._values(next_state)[i] for i in self.admissible_actions(next_state))
         values[action] += self.alpha * (reward + self.gamma * future - values[action])
 
     def save(self, path: str | Path) -> None:
@@ -155,15 +196,71 @@ class QLearningAgent:
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0, seed: int = 0) -> "QLearningAgent":
         payload = json.loads(Path(path).read_text())
-        if payload.get("version") != POLICY_VERSION:
+        if payload.get("version") not in (4, POLICY_VERSION):
             raise ValueError("unsupported RL policy; retrain with the current reward model")
         agent = cls(tuple(tuple(action) for action in payload["actions"]),
                     alpha=float(payload["alpha"]), gamma=float(payload["gamma"]), epsilon=epsilon, seed=seed)
         agent.table = {tuple(key.split("|")): list(map(float, values)) for key, values in payload["table"].items()}
         agent.training_runs = int(payload.get("training_runs", 0))
+        agent.legacy_inference = payload.get('version') == 4
         if any(len(values) != len(agent.actions) for values in agent.table.values()):
             raise ValueError("invalid RL policy table")
         return agent
+
+
+class RLController:
+    """Shared encoder-based manoeuvre memory for training and inference."""
+
+    def __init__(self, agent):
+        self.agent = agent
+        self.action = None
+        self.previous = 'none'
+        self.failed = 'none'
+        self.blocked_action = None
+        self.blocked_seconds = 0.0
+        self.progress = 0.0
+        self.timestamp = None
+        self.recovery_until = -float('inf')
+        self.was_contact = False
+
+    def observe(self, sensor, target, obstacle):
+        elapsed = 0 if self.timestamp is None else max(0, sensor.timestamp-self.timestamp)
+        self.timestamp = sensor.timestamp
+        self.progress += abs(sensor.encoder_delta)
+        if self.progress >= .01 and sensor.timestamp >= self.recovery_until:
+            self.failed = 'none'
+            self.blocked_action = None
+            self.progress = 0.0
+        if self.action is not None:
+            traction, steering = self.agent.actions[self.action]
+            direction = 'forward' if traction > 0 else 'reverse'
+            turn = 'left' if steering < -.1 else 'right' if steering > .1 else 'straight'
+            self.previous = f'{direction}_{turn}'
+            if sensor.contact and not self.was_contact:
+                # Do not cancel escape after the very first millimetres: that
+                # produced a deterministic retreat/re-impact loop in testing.
+                self.failed = direction + '_failed'
+                self.blocked_action = self.action
+                self.recovery_until = sensor.timestamp + .8
+                self.progress = 0.0
+            if sensor.contact and abs(sensor.encoder_delta) < .0001:
+                self.blocked_seconds += elapsed
+                if self.blocked_seconds >= .4 - 1e-9:
+                    self.failed = direction + '_failed'
+                    self.blocked_action = self.action
+            else:
+                self.blocked_seconds = 0.0
+        self.was_contact = sensor.contact
+        return observation_state(sensor, target, obstacle, previous=self.previous, failed=self.failed,
+                                 blocked_action=self.blocked_action)
+
+    def choose(self, state, *, explore):
+        action = self.agent.choose(state, explore=explore)
+        if self.action is not None and self.agent.actions[action][0]*self.agent.actions[self.action][0] < 0:
+            self.blocked_seconds = 0.0
+            self.progress = 0.0
+        self.action = action
+        return action
 
 
 class QLearningBrain:
@@ -174,18 +271,19 @@ class QLearningBrain:
         self.reset()
 
     def reset(self):
+        self.controller = RLController(self.agent)
         self._action = None
         self._until = -float('inf')
 
     def step(self, sensor: SensorFrame, target: ObjectObservation | None, motion,
              familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
-        state = observation_state(sensor, target, obstacle)
+        state = self.controller.observe(sensor, target, obstacle)
         if self._action is None or sensor.timestamp >= self._until - 1e-9:
-            self._action = self.agent.choose(state, explore=False)
+            self._action = self.controller.choose(state, explore=False)
             self._until = sensor.timestamp + ACTION_DURATION
         action = self._action
         traction, steering = self.agent.actions[action]
-        value = self.agent.value(state, action)
+        value = self.agent.values(state)[action]
         command = ActuatorCommand(traction, steering, sensor.timestamp, 0)
         telemetry = BrainTelemetry(
             populations={"rl_best_value": value, "rl_known_states": float(len(self.agent.table))},

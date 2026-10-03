@@ -20,6 +20,8 @@ class SensorFrame:
     speed: float = 0.0
     range_left: float = 1.2
     range_right: float = 1.2
+    contact_front: bool = False
+    contact_rear: bool = False
 
 
 @dataclass(frozen=True)

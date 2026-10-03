@@ -14,7 +14,9 @@ from fly_brain_rc.contracts import (
 class ContractTests(unittest.TestCase):
     def test_sensor_frame_exposes_only_embodied_sensors(self):
         names = {field.name for field in dataclasses.fields(SensorFrame)}
-        self.assertEqual(names, {"rgb", "gray", "yaw_rate", "encoder_delta", "tof", "contact", "timestamp"})
+        self.assertEqual(names, {"rgb", "gray", "yaw_rate", "encoder_delta", "tof", "contact", "timestamp",
+                                 "contact_left", "contact_right", "speed", "range_left", "range_right",
+                                 "contact_front", "contact_rear"})
         self.assertTrue(names.isdisjoint({"goal", "goal_distance", "x", "y", "pose", "absolute_yaw"}))
 
     def test_actuator_command_clamps_outputs(self):
