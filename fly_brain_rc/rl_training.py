@@ -45,6 +45,12 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         raise ValueError("episodes and steps must be positive integers")
     output = Path(output)
     agent = load_training_agent(output, seed=seed, epsilon=epsilon)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    run_number = agent.training_runs + 1
+    if output.exists():
+        snapshot = output.with_name(f'{output.stem}.before-run-{run_number}.json')
+        if not snapshot.exists():
+            shutil.copy2(output, snapshot)
     run_seed = seed + agent.training_runs * 10_007
     agent._rng.seed(run_seed)
     target_detector, obstacle_detector = MockRedBallDetector(), MockBlueObstacleDetector()
@@ -67,13 +73,13 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         reward_model = ExplorationReward()
         reward_model.reset(env.car_pose()[:2])
         total = 0.0
+        contact_seconds = reverse_seconds = reverse_distance = stalled_seconds = 0.0
         try:
             sensor = env.sensor_frame()
             state = observation_state(sensor, target_detector.detect(sensor, 'red_ball'),
                                       obstacle_detector.detect(sensor, 'obstacle'))
             remaining = 0
             window_reward = 0.0
-            reverse_time = 0.0
             for sequence in range(1, steps + 1):
                 if remaining == 0:
                     action = agent.choose(state)
@@ -91,10 +97,12 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
                                            contact=next_sensor.contact, reached=reached,
-                                           target=next_target)
-                reverse_time = reverse_time + env.drive.timestep if next_sensor.speed < -.025 else 0.0
-                if reverse_time > .6:
-                    reward -= .04 * env.drive.timestep
+                                           target=next_target, speed=next_sensor.speed,
+                                           dt=env.drive.timestep)
+                contact_seconds += float(next_sensor.contact) * env.drive.timestep
+                reverse_seconds += float(next_sensor.speed < -.025) * env.drive.timestep
+                reverse_distance += max(0.0, -next_sensor.encoder_delta)
+                stalled_seconds += float(not moved) * env.drive.timestep
                 window_reward += reward
                 remaining -= 1
                 if remaining == 0 or reached or sequence == steps:
@@ -126,6 +134,15 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 env.renderer.close()
         rewards.append(total)
         cells.append(len(reward_model.visited))
+        report = dict(run=run_number, episode=index + 1, phase=('open', 'occluded', 'clutter')[phase],
+                      seed=case.seed if phase < 2 else run_seed + index,
+                      success=bool(reached), steps=sequence,
+                      duration=sequence * env.drive.timestep, reward=total,
+                      explored_cells=len(reward_model.visited), contacts=env.collisions,
+                      contact_seconds=contact_seconds, reverse_seconds=reverse_seconds,
+                      reverse_distance=reverse_distance, stalled_seconds=stalled_seconds)
+        with output.with_suffix('.history.jsonl').open('a') as history:
+            history.write(json.dumps(report, allow_nan=False) + '\n')
         # Gradually reduce random exploration while keeping occasional novelty.
         agent.epsilon = max(0.04, epsilon * (1.0 - (index + 1) / (episodes * 1.15)))
 

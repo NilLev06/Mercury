@@ -53,7 +53,7 @@ class ExplorationReward:
 
     def __init__(self, *, cell_size: float = 0.45, new_cell_reward: float = 1.0,
                  idle_penalty: float = 0.01, max_idle_penalty: float = 0.12,
-                 contact_penalty: float = 1.5, escape_reward: float = 0.5,
+                 contact_penalty: float = 1.5,
                  goal_reward: float = 50.0):
         if cell_size <= 0:
             raise ValueError("cell_size must be positive")
@@ -62,7 +62,6 @@ class ExplorationReward:
         self.idle_penalty = idle_penalty
         self.max_idle_penalty = max_idle_penalty
         self.contact_penalty = contact_penalty
-        self.escape_reward = escape_reward
         self.goal_reward = goal_reward
         self.reset((0.0, 0.0))
 
@@ -74,9 +73,10 @@ class ExplorationReward:
         self.stationary_steps = 0
         self._contact_active = False
         self._target_potential = None
+        self._reverse_seconds = 0.0
 
     def step(self, position: tuple[float, float], *, moved: bool, contact: bool, reached: bool,
-             target: ObjectObservation | None = None) -> float:
+             target: ObjectObservation | None = None, speed: float = 0.0, dt: float = .02) -> float:
         reward = 0.0
         cell = self._cell(position)
         if cell not in self.visited:
@@ -84,8 +84,6 @@ class ExplorationReward:
             reward += self.new_cell_reward
         if moved:
             self.stationary_steps = 0
-            if self._contact_active and not contact:
-                reward += self.escape_reward
         else:
             self.stationary_steps += 1
             reward -= min(self.max_idle_penalty, self.idle_penalty * self.stationary_steps)
@@ -95,15 +93,16 @@ class ExplorationReward:
         if target is None:
             self._target_potential = None
         else:
-            # A dense visual shaping signal: keep the target in view, bring it
-            # toward the optical centre, and make it grow in the image.
-            reward += 0.002
-            if abs(target.bearing) <= 0.18:
-                reward += 0.004
+            # Reward improvement, not merely having the ball in the frame.
             potential = 4.0 * target.apparent_area - 0.15 * abs(target.bearing)
             if self._target_potential is not None:
                 reward += max(-0.10, min(0.10, 2.0 * (potential - self._target_potential)))
             self._target_potential = potential
+        self._reverse_seconds = self._reverse_seconds + dt if speed < -.025 else 0.0
+        if self._reverse_seconds > .6:
+            # Allow a short retreat, then increase the cost to 0.4 per second.
+            rate = min(.4, .2 + .1 * (self._reverse_seconds - .6))
+            reward -= rate * dt
         if reached:
             reward += self.goal_reward
         return reward

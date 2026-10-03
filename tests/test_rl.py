@@ -31,6 +31,12 @@ class ReinforcementLearningTests(unittest.TestCase):
             learner = QLearningAgent.load(path)
             self.assertEqual(instances[0].sensor_frame.call_count, 21)
             self.assertTrue(any('forward' in state for state in learner.table))
+            import json
+            reports = [json.loads(line) for line in path.with_suffix('.history.jsonl').read_text().splitlines()]
+            self.assertEqual(len(reports), 1)
+            self.assertEqual(reports[0]['steps'], 20)
+            self.assertIn('contact_seconds', reports[0])
+            self.assertIn('reverse_distance', reports[0])
 
     def test_policy_holds_action_despite_changed_observation_until_point_two_seconds(self):
         learner = QLearningAgent(actions=((.3, -.6), (.3, .6)), epsilon=0)
@@ -65,7 +71,7 @@ class ReinforcementLearningTests(unittest.TestCase):
         self.assertLess(first_idle, 0.0)
         self.assertLess(repeated_idle, first_idle)
 
-    def test_centered_target_gives_more_immediate_motivation_than_no_target(self):
+    def test_only_target_improvement_is_rewarded(self):
         reward = ExplorationReward()
         reward.reset((0.0, 0.0))
         centered = ObjectObservation("red_ball", 1.0, (.4, .4, .6, .6), 0.0, .05, 0.0)
@@ -73,7 +79,25 @@ class ReinforcementLearningTests(unittest.TestCase):
         no_target = reward.step((0.0, 0.0), moved=True, contact=False, reached=False, target=None)
         target_reward = reward.step((0.0, 0.0), moved=True, contact=False, reached=False, target=centered)
 
-        self.assertGreater(target_reward, no_target)
+        self.assertEqual(target_reward, no_target)
+        unchanged = reward.step((0, 0), moved=True, contact=False, reached=False, target=centered)
+        closer = reward.step((0, 0), moved=True, contact=False, reached=False,
+                             target=replace(centered, apparent_area=.06))
+        self.assertEqual(unchanged, 0)
+        self.assertGreater(closer, 0)
+
+    def test_contact_release_gives_no_repeatable_bonus(self):
+        reward = ExplorationReward()
+        reward.step((0, 0), moved=True, contact=True, reached=False)
+        self.assertEqual(reward.step((0, 0), moved=True, contact=False, reached=False), 0)
+
+    def test_short_reverse_is_allowed_but_prolonged_reverse_costs_more(self):
+        reward = ExplorationReward()
+        values = [reward.step((0, 0), moved=True, contact=False, reached=False, speed=-.2, dt=.02)
+                  for _ in range(200)]
+        self.assertEqual(sum(values[:25]), 0)
+        self.assertLess(sum(values[50:100]), -.2)
+        self.assertLess(sum(values[150:200]), sum(values[50:100]))
 
     def test_stall_penalty_is_capped_and_contact_is_only_charged_on_impact(self):
         reward = ExplorationReward(idle_penalty=.01, max_idle_penalty=.12, contact_penalty=1.5)
