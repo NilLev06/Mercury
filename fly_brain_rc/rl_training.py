@@ -26,7 +26,10 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
     """Resume the persisted policy when it exists; otherwise create its seed."""
     output = Path(output)
     if output.exists():
-        version = json.loads(output.read_text()).get('version')
+        payload = json.loads(output.read_text())
+        if payload.get('task','navigation') != 'navigation':
+            raise ValueError('general training requires a navigation policy, not the bypass experiment')
+        version = payload.get('version')
         if version != POLICY_VERSION:
             backup = output.with_name(output.name + f'.v{version}.bak')
             index = 1
@@ -44,7 +47,7 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
 
 
 def train_q_learning(*, episodes: int, steps: int, output: str | Path,
-                     seed: int = 0, epsilon: float = 0.25, emit=None, progress=None) -> TrainingSummary:
+                     seed: int = 0, epsilon: float = 0.25, emit=None, progress=None, cancel=None) -> TrainingSummary:
     if type(episodes) is not int or episodes <= 0 or type(steps) is not int or steps <= 0:
         raise ValueError("episodes and steps must be positive integers")
     output = Path(output)
@@ -64,6 +67,8 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
     recover_cases = recovery_cases(run_seed, episodes)
 
     for index in range(episodes):
+        if cancel and cancel():
+            break
         # Every launch expands the map experience.  Within a launch, advance
         # from near-contact recovery to pursuit, one occluder and clutter.
         phase = index * 4 // episodes
@@ -85,6 +90,8 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         controller = RLController(agent)
         reward_model.reset(env.car_pose()[:2])
         total = 0.0
+        reached, sequence, cancelled = False,0,False
+        applied_steps = 0
         contact_seconds = reverse_seconds = reverse_distance = stalled_seconds = 0.0
         try:
             sensor = env.sensor_frame()
@@ -93,6 +100,9 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
             remaining = 0
             window_reward = 0.0
             for sequence in range(1, steps + 1):
+                if cancel and cancel():
+                    cancelled = True
+                    break
                 if remaining == 0:
                     action = controller.choose(state, explore=True)
                     window_learnable = not controller.overriding
@@ -101,6 +111,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                     remaining = max(1, round(ACTION_DURATION / env.drive.timestep))
                 traction, steering = agent.actions[action]
                 env.apply(ActuatorCommand(traction, steering, sensor.timestamp, sequence))
+                applied_steps += 1
 
                 next_sensor = env.sensor_frame()
                 next_target = target_detector.detect(next_sensor, "red_ball")
@@ -150,6 +161,8 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 if reached:
                     successes += 1
                     break
+            if cancelled and remaining > 0 and applied_steps and window_learnable:
+                agent.update(window_state,action,window_reward,state,terminal=controller.mode!='drive')
         finally:
             if env.renderer is not None:
                 env.renderer.close()
@@ -157,17 +170,21 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
         cells.append(len(reward_model.visited))
         report = dict(policy_version=POLICY_VERSION, run=run_number, episode=index + 1, phase=('recovery', 'open', 'occluded', 'clutter')[phase],
                       seed=case.seed if phase < 3 else run_seed + index,
-                      success=bool(reached), steps=sequence,
-                      duration=sequence * env.drive.timestep, reward=total,
+                      success=bool(reached), steps=applied_steps, cancelled=cancelled,
+                      duration=applied_steps * env.drive.timestep, reward=total,
                       explored_cells=len(reward_model.visited), contacts=env.collisions,
                       contact_seconds=contact_seconds, reverse_seconds=reverse_seconds,
                       reverse_distance=reverse_distance, stalled_seconds=stalled_seconds)
         with output.with_suffix('.history.jsonl').open('a') as history:
             history.write(json.dumps(report, allow_nan=False) + '\n')
+        print(json.dumps(report,allow_nan=False),flush=True)
         # Gradually reduce random exploration while keeping occasional novelty.
         agent.epsilon = max(0.04, epsilon * (1.0 - (index + 1) / (episodes * 1.15)))
+        agent.training_runs = run_number
+        agent.save(output)
+        if cancelled:
+            break
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    agent.training_runs += 1
-    agent.save(output)
-    return TrainingSummary(episodes, successes, sum(rewards) / episodes, sum(cells) / episodes)
+    return TrainingSummary(len(rewards), successes, sum(rewards) / len(rewards) if rewards else 0,
+                           sum(cells) / len(cells) if cells else 0)

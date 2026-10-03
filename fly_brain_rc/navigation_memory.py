@@ -4,8 +4,9 @@ from dataclasses import replace
 
 
 class NavigationMemory:
-    def __init__(self, ttl=12.0):
+    def __init__(self, ttl=12.0, *, enable_bypass=True):
         self.ttl = ttl
+        self.enable_bypass = enable_bypass
         self.goal = None
         self.vector = None
         self.seen_at = self.last_time = None
@@ -47,6 +48,9 @@ class NavigationMemory:
             self.goal,self.seen_at = target,sensor.timestamp
         elif self.seen_at is not None and sensor.timestamp-self.seen_at > self.ttl:
             self.goal = self.vector = None
+
+        if not self.enable_bypass:
+            return
 
         if recovered and self.phase != 'drive':
             self._phase('along',sensor.timestamp)

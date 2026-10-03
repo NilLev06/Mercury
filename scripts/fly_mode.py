@@ -2,6 +2,7 @@
 import argparse
 import sys
 import time
+import os
 import mujoco.viewer
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
@@ -48,7 +49,8 @@ def main():
             from fly_brain_rc.dashboard.server import DashboardServer, MissionController
             bus, mission = TelemetryBus(), MissionController(running=True)
             dashboard = DashboardServer(bus, mission).start()
-            webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
+            if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
+                webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
         with mujoco.viewer.launch_passive(env.m, env.d) as viewer:
             viewer.cam.azimuth, viewer.cam.elevation, viewer.cam.distance = -30, -55, 5.5
             for episode in range(args.max_episodes):
@@ -63,6 +65,7 @@ def main():
                     env._sync_kinematic()
                     env._last_encoder_position = env._encoder_position()
                 runtime = FlyRuntime(env, brain, target=args.target,
+                                     bypass_evaluation=getattr(getattr(brain,'agent',None),'task',None)=='bypass-v1',
                                      memory=memory,
                                      emit=bus.publish if dashboard else None,
                                      mission=mission if dashboard else None)

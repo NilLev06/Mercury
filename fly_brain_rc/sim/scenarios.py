@@ -20,6 +20,7 @@ def _obstacles(points: list[tuple[float, float]]) -> tuple[Obstacle, ...]:
 
 
 _SCENARIOS = {
+    "single_cylinder": Scenario("single_cylinder",_obstacles([(1.15,.18)]),(2.35,0.0)),
     "corridor": Scenario(
         "corridor",
         _obstacles(

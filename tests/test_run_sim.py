@@ -42,7 +42,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(args.out, 'tmp.json')
 
     def test_train_rl_uses_mjpython_on_macos_for_camera_rendering(self):
-        args = argparse.Namespace(episodes=2, steps=9, seed=4, epsilon=.2, out='tmp.json', dashboard=False)
+        args = argparse.Namespace(command='train-rl',episodes=2, steps=9, seed=4, epsilon=.2, out='tmp.json', dashboard=False)
         with patch('run.sys.platform', 'darwin'), patch.dict('run.os.environ', {}, clear=True), \
              patch('run._mjpython_path', return_value='/opt/mjpython'), \
              patch('run.os.execv', side_effect=SystemExit(0)) as execute:

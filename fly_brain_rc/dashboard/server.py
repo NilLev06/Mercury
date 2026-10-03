@@ -1,6 +1,7 @@
 """Standard-library HTTP/SSE server; only mission commands cross this boundary."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 from queue import Empty
 from threading import Event, Lock, Thread
@@ -58,7 +59,9 @@ class MissionController:
 
 
 class DashboardServer:
-    def __init__(self, bus, mission, host='127.0.0.1', port=8765):
+    def __init__(self, bus, mission, host='127.0.0.1', port=None):
+        if port is None:
+            port = int(os.environ.get('DIGITAL_FLY_DASHBOARD_PORT','8765'))
         self.bus, self.mission = bus, mission
         self.closed = Event()
         owner = self

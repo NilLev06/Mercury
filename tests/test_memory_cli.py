@@ -11,11 +11,25 @@ import run
 
 
 class MemoryCliTests(unittest.TestCase):
-    def test_double_click_launcher_offers_every_interactive_map(self):
-        launcher = (Path(__file__).resolve().parents[1] / 'Digital Fly Car.command').read_text()
-        self.assertIn('choose from list', launcher)
-        for scenario in ('corridor', 'turn_corridor', 'slalom', 'blocked_goal', 'random'):
-            self.assertIn(scenario, launcher)
+    def test_double_click_launcher_opens_lab_in_its_project_directory(self):
+        import os
+        import subprocess
+        import sys
+        import json
+        launcher = Path(__file__).resolve().parents[1] / 'Digital Fly Car.command'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy = root/'Digital Fly Car.command'
+            copy.write_bytes(launcher.read_bytes())
+            fake = root/'python'
+            fake.write_text(f'#!{sys.executable}\nimport os,sys,json\nprint(json.dumps([os.getcwd(),sys.argv[1:]]))\n')
+            fake.chmod(0o755)
+            result = subprocess.run(['zsh',str(copy)],cwd='/private/tmp',
+                                    env=dict(os.environ,DIGITAL_FLY_PYTHON=str(fake)),
+                                    capture_output=True,text=True,check=True)
+            cwd,args = json.loads(result.stdout)
+            self.assertEqual(Path(cwd).resolve(),root.resolve())
+            self.assertEqual(args,['run.py','lab'])
 
     def test_plain_launcher_defaults_to_ephemeral_memory(self):
         with patch('sys.argv', ['run.py', 'sim']), patch('run._run_simulator', return_value=0) as launch:

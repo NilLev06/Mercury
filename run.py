@@ -63,7 +63,7 @@ def _run_simulator(args: argparse.Namespace) -> int:
 def _run_rl_trainer(args: argparse.Namespace) -> int:
     """Use MuJoCo's macOS Python trampoline for offscreen camera training."""
     if sys.platform == "darwin" and "MJPYTHON_BIN" not in os.environ:
-        command = [_mjpython_path(), str(Path(__file__).resolve()), "train-rl",
+        command = [_mjpython_path(), str(Path(__file__).resolve()), args.command,
                    "--episodes", str(args.episodes), "--steps", str(args.steps),
                    "--seed", str(args.seed), "--epsilon", str(args.epsilon), "--out", args.out]
         if args.dashboard:
@@ -80,14 +80,22 @@ def _run_rl_trainer(args: argparse.Namespace) -> int:
         from fly_brain_rc.telemetry import TelemetryBus
         bus, mission = TelemetryBus(), MissionController(running=True)
         dashboard = DashboardServer(bus, mission).start()
-        webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
+        if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
+            webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
         emit = bus.publish
         progress = mission.update_training
     else:
         emit = progress = None
     try:
-        result = train_q_learning(episodes=args.episodes, steps=args.steps, output=args.out,
-                                  seed=args.seed, epsilon=args.epsilon, emit=emit, progress=progress)
+        cancel_path = os.environ.get('DIGITAL_FLY_CANCEL_FILE')
+        cancel = (lambda: Path(cancel_path).exists()) if cancel_path else None
+        options = dict(episodes=args.episodes,steps=args.steps,output=args.out,
+                       seed=args.seed,epsilon=args.epsilon,emit=emit,progress=progress,cancel=cancel)
+        if args.command in ('train-bypass','test-bypass'):
+            from fly_brain_rc.bypass_learning import train_bypass
+            result = train_bypass(**options,evaluate=args.command=='test-bypass')
+        else:
+            result = train_q_learning(**options)
         if mission is not None:
             mission.finish({'successes': result.successes, 'mean_reward': result.mean_reward})
     finally:
@@ -102,7 +110,7 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sim = subparsers.add_parser("sim", help="open the interactive MuJoCo viewer")
-    sim.add_argument("--scenario", choices=("random", "blocked_goal", "corridor", "slalom", "turn_corridor"), default="corridor")
+    sim.add_argument("--scenario", choices=("random", "blocked_goal", "corridor", "slalom", "turn_corridor", "single_cylinder"), default="corridor")
     sim.add_argument("--seed", type=int, default=0)
     sim.add_argument("--episodes", type=int, default=1)
     sim.add_argument('--dashboard', action='store_true')
@@ -136,6 +144,16 @@ def main() -> int:
     train_rl.add_argument('--epsilon', type=float, default=.25)
     train_rl.add_argument('--out', default='artifacts/rl/q-policy.json')
     train_rl.add_argument('--dashboard', action='store_true', help='show live camera and learning telemetry in browser')
+    for name in ('train-bypass','test-bypass'):
+        command = subparsers.add_parser(name,help='isolated single-cylinder bypass learning/evaluation')
+        command.add_argument('--episodes',type=int,default=120 if name=='train-bypass' else 20)
+        command.add_argument('--steps',type=int,default=2400)
+        command.add_argument('--seed',type=int,default=0)
+        command.add_argument('--epsilon',type=float,default=.3)
+        command.add_argument('--out',default='artifacts/rl/bypass-policy.json')
+        command.add_argument('--dashboard',action='store_true')
+    lab = subparsers.add_parser('lab',help='persistent browser mode selector')
+    lab.add_argument('--port',type=int,default=8765)
     args = parser.parse_args()
     if args.command == 'sim' and args.reset_memory and args.memory is None:
         parser.error('--reset-memory requires --memory PATH')
@@ -168,7 +186,11 @@ def main() -> int:
             return 0
         except (ValueError, TypeError, OSError) as exc:
             parser.error(str(exc))
-    if args.command == 'train-rl':
+    if args.command == 'lab':
+        from fly_brain_rc.dashboard.lab import run_lab
+        run_lab(PROJECT_ROOT,args.port)
+        return 0
+    if args.command in ('train-rl','train-bypass','test-bypass'):
         if args.episodes <= 0 or args.steps <= 0 or not 0 <= args.epsilon <= 1:
             parser.error('--episodes and --steps must be positive; --epsilon must be in [0, 1]')
         return _run_rl_trainer(args)

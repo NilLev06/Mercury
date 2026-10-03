@@ -7,13 +7,13 @@ class ScenarioTests(unittest.TestCase):
     def test_navigation_suite_has_distinct_fixed_maps(self):
         self.assertEqual(
             scenario_names(),
-            ["blocked_goal", "corridor", "slalom", "turn_corridor"],
+            ["blocked_goal", "corridor", "single_cylinder", "slalom", "turn_corridor"],
         )
         layouts = {
             name: (get_scenario(name).goal, tuple(p for p, _ in get_scenario(name).obstacles))
             for name in scenario_names()
         }
-        self.assertEqual(len(set(layouts.values())), 4)
+        self.assertEqual(len(set(layouts.values())), 5)
 
     def test_corridor_is_straight_with_goal_at_far_end(self):
         scenario = get_scenario("corridor")

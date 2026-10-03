@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import random
+import os
+import tempfile
 
 from .contracts import ActuatorCommand, BrainTelemetry, ObjectObservation, SensorFrame
 from .recovery import RecoveryManoeuvre
@@ -128,6 +130,7 @@ class QLearningAgent:
         self._rng = random.Random(self.seed)
         self.table: dict[tuple[str, ...], list[float]] = {}
         self.training_runs = 0
+        self.task = 'navigation'
         self.legacy_inference = False
 
     def values(self, state):
@@ -195,9 +198,24 @@ class QLearningAgent:
             "version": POLICY_VERSION, "actions": self.actions, "alpha": self.alpha,
             "gamma": self.gamma, "epsilon": self.epsilon,
             "training_runs": self.training_runs,
+            "task": self.task,
             "table": {"|".join(state): values for state, values in self.table.items()},
         }
-        Path(path).write_text(json.dumps(payload, sort_keys=True))
+        path = Path(path)
+        with tempfile.NamedTemporaryFile(mode='w',dir=path.parent,delete=False) as handle:
+            temporary = handle.name
+            try:
+                json.dump(payload,handle,sort_keys=True,allow_nan=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            except BaseException:
+                os.unlink(temporary)
+                raise
+        try:
+            os.replace(temporary,path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
     @classmethod
     def load(cls, path: str | Path, *, epsilon: float = 0.0, seed: int = 0) -> "QLearningAgent":
@@ -228,6 +246,9 @@ class QLearningAgent:
                 estimates.append(sum(known)/len(known) if known else 0.0)
             agent.table[state] = estimates
         agent.training_runs = int(payload.get("training_runs", 0))
+        agent.task = payload.get('task','navigation')
+        if agent.task not in ('navigation','bypass-v1'):
+            raise ValueError('unsupported policy task')
         agent.legacy_inference = False
         if any(len(values) != len(agent.actions) for values in agent.table.values()):
             raise ValueError("invalid RL policy table")
@@ -243,7 +264,7 @@ class RLController:
         self.blocked_seconds = 0.0
         self.timestamp = None
         self.recovery = RecoveryManoeuvre()
-        self.navigation = NavigationMemory()
+        self.navigation = NavigationMemory(enable_bypass=agent.task != 'bypass-v1')
         self.sensor = None
         self.overriding = False
 
@@ -253,6 +274,9 @@ class RLController:
 
     def observe(self, sensor, target, obstacle):
         self.sensor = sensor
+        if self.agent.task == 'bypass-v1':
+            self.navigation.observe(sensor,target,obstacle)
+            return self._policy_state(sensor,target,obstacle)
         traction = None if self.action is None else self.agent.actions[self.action][0]
         old_phase = self.recovery.phase
         self.recovery.observe(sensor, traction, obstacle, target)
@@ -270,6 +294,9 @@ class RLController:
                 self.blocked_seconds = 0.0
         else:
             self.blocked_seconds = 0.0
+        return self._policy_state(sensor,target,obstacle)
+
+    def _policy_state(self, sensor, target, obstacle):
         effective = target if target is not None else self.navigation.recalled_target(sensor)
         state = observation_state(sensor,effective,obstacle)
         if target is None and effective is not None:
@@ -308,7 +335,8 @@ class QLearningBrain:
              familiarity: float, dt: float, *, obstacle: ObjectObservation | None = None):
         old_mode = self.controller.mode
         state = self.controller.observe(sensor, target, obstacle)
-        if self._action is None or sensor.timestamp >= self._until - 1e-9 or old_mode != self.controller.mode:
+        unsafe = self._action is not None and self._action not in self.agent.admissible_actions(state)
+        if self._action is None or unsafe or sensor.timestamp >= self._until - 1e-9 or old_mode != self.controller.mode:
             self._action = self.controller.choose(state, explore=False)
             self._until = sensor.timestamp + ACTION_DURATION
         action = self._action
