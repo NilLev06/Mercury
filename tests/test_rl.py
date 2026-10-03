@@ -15,6 +15,95 @@ import numpy as np
 
 
 class ReinforcementLearningTests(unittest.TestCase):
+    def test_centered_visible_goal_does_not_start_range_avoidance(self):
+        from fly_brain_rc.rl import RLController
+        c = RLController(QLearningAgent())
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,.15,False,0)
+        goal = ObjectObservation('red_ball',1,(.3,.2,.95,.8),.31,.4,0)
+        c.action = 5
+        c.observe(s,goal,None)
+        self.assertEqual(c.recovery.phase,'drive')
+
+    def test_contact_interrupts_held_forward_action_immediately(self):
+        s = SensorFrame(np.zeros((2,2,3),dtype=np.uint8),np.zeros((2,2)),0,0,1.2,False,0)
+        brain = QLearningBrain(QLearningAgent())
+        self.assertGreater(brain.step(s,None,None,0,.02)[0].traction,0)
+        command = brain.step(replace(s,timestamp=.02,contact=True,contact_front=True),None,None,0,.02)[0]
+        self.assertLess(command.traction,0)
+
+    def test_recovery_commands_are_not_learned_as_normal_actions(self):
+        with tempfile.TemporaryDirectory() as directory, patch('fly_brain_rc.sim.env.mujoco.Renderer', HeadlessRenderer):
+            p = Path(directory)/'policy.json'
+            train_q_learning(episodes=1,steps=100,output=p,epsilon=0)
+            a = QLearningAgent.load(p)
+            # One pursuit window initiates avoidance. The following recovery
+            # windows must not populate Q with scripted reverse/arc commands.
+            self.assertEqual(len(a.table),1)
+            self.assertEqual(sum(v != 0 for row in a.table.values() for v in row),1)
+
+    def test_contact_release_leads_to_committed_arc_not_pursuit(self):
+        from fly_brain_rc.rl import RLController
+        a = QLearningAgent()
+        c = RLController(a)
+        s = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)),0,0,1.2,True,0,contact_front=True)
+        state = c.observe(s,None,None)
+        self.assertLess(a.actions[c.choose(state,explore=False)][0],0)
+        state = c.observe(replace(s,timestamp=3.8,contact=False,contact_front=False,encoder_delta=-.9),None,None)
+        command = a.actions[c.choose(state,explore=False)]
+        self.assertGreater(command[0],0)
+        self.assertGreater(abs(command[1]),.5)
+        self.assertTrue(c.overriding)
+
+    def test_compact_key_does_not_split_by_previous_command(self):
+        s = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)),0,0,1.2,False,0)
+        self.assertEqual(observation_state(s,None,None,previous='forward_left',failed='forward_failed',blocked_action=3),
+                         observation_state(s,None,None,previous='reverse_right'))
+
+    def test_v5_migration_merges_estimates_without_erasing_training(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory)/'policy.json'
+            base = 'target_none|clear|small|clear|clear|clear|forward|no_contact|no_contact'
+            old = json.dumps(dict(version=5,actions=[[.3,0],[-.7,0]],alpha=.18,gamma=.98,training_runs=1,
+                                 table={base+'|forward_left|none|none':[2,0],base+'|forward_right|none|none':[4,-2],
+                                        base+'|reverse_right|forward_failed|5':[100,100]}))
+            p.write_text(old)
+            a = load_training_agent(p,seed=0,epsilon=.25)
+            self.assertEqual(len(a.table),1)
+            self.assertEqual(a.table[tuple(base.split('|'))],[3,-2])
+            self.assertEqual(a.training_runs,1)
+            self.assertEqual(p.with_name('policy.json.v5.bak').read_text(),old)
+
+    def test_migration_retains_estimates_when_ordinary_values_are_zero(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory)/'policy.json'
+            base = 'target_none|clear|small|clear|clear|clear|forward|no_contact|no_contact'
+            p.write_text(json.dumps(dict(version=5,actions=[[.3,0],[-.7,0]],alpha=.18,gamma=.98,
+                table={base+'|forward_left|none|none':[0,0],base+'|reverse_right|forward_failed|5':[10,-2]})))
+            self.assertEqual(QLearningAgent.load(p).table[tuple(base.split('|'))],[10,-2])
+
+    def test_front_wall_escape_changes_heading_and_gets_clear(self):
+        from fly_brain_rc.rl import RLController
+        from fly_brain_rc.sim.kinematics import BicycleState
+        from fly_brain_rc.sim.scenarios import Scenario
+        from fly_brain_rc.config import SIM,DRIVE
+        from fly_brain_rc.contracts import ActuatorCommand
+        with patch('fly_brain_rc.sim.env.mujoco.Renderer', HeadlessRenderer):
+            env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('wall',(),(0,.6)))
+            env.state = BicycleState(2.77,0,0)
+            env._sync_kinematic()
+            c = RLController(QLearningAgent())
+            for i in range(800):
+                s = env.sensor_frame()
+                state = c.observe(s,None,None)
+                if i%10==0: action = c.choose(state,explore=False)
+                t,w = c.agent.actions[action]
+                env.apply(ActuatorCommand(t,w,s.timestamp,i))
+            self.assertLess(env.car_pose()[0],2.4)
+            self.assertGreater(abs(env.car_pose()[2]),.8)
+            env.renderer.close()
+
     def test_recovery_memory_survives_brief_contact_release(self):
         from fly_brain_rc.rl import RLController
         agent = QLearningAgent()
@@ -24,7 +113,7 @@ class ReinforcementLearningTests(unittest.TestCase):
         controller.action = 5
         controller.observe(replace(sensor, timestamp=.02, contact=True, contact_front=True), None, None)
         state = controller.observe(replace(sensor, timestamp=.22, encoder_delta=.015), None, None)
-        self.assertEqual(state[10], 'forward_failed')
+        self.assertEqual(controller.recovery.phase, 'retreat')
         self.assertLess(agent.actions[controller.choose(state, explore=False)][0], 0)
 
     def test_bootstrap_ignores_direction_blocked_by_bumper(self):
@@ -67,9 +156,12 @@ class ReinforcementLearningTests(unittest.TestCase):
         sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2)),
                              0, 0, 1.2, True, 0, contact_right=True, contact_rear=True)
         agent = QLearningAgent()
-        state = observation_state(sensor, None, None, previous='forward_right', failed='forward_failed', blocked_action=2)
+        from fly_brain_rc.rl import RLController
+        controller = RLController(agent)
+        controller.action = 2
+        state = controller.observe(sensor,None,None)
         agent.table[state] = [0, 0, 99, 0, 0, 0, 0, 100, 0, 0, 0]
-        action = agent.choose(state, explore=False)
+        action = controller.choose(state, explore=False)
         self.assertGreater(agent.actions[action][0], 0)
         self.assertLessEqual(agent.actions[action][1], .1)
 
@@ -100,7 +192,7 @@ class ReinforcementLearningTests(unittest.TestCase):
             train_q_learning(episodes=1, steps=20, output=path)
             learner = QLearningAgent.load(path)
             self.assertEqual(instances[0].sensor_frame.call_count, 21)
-            self.assertTrue(any('forward' in state for state in learner.table))
+            self.assertTrue(learner.table)
             import json
             reports = [json.loads(line) for line in path.with_suffix('.history.jsonl').read_text().splitlines()]
             self.assertEqual(len(reports), 1)
@@ -112,7 +204,7 @@ class ReinforcementLearningTests(unittest.TestCase):
         learner = QLearningAgent(actions=((.3, -.6), (.3, .6)), epsilon=0)
         sensor = SensorFrame(np.zeros((2,2,3), dtype=np.uint8), np.zeros((2,2), dtype=np.uint8),
                              0, 0, .8, False, 0)
-        other = replace(sensor, tof=.1, timestamp=.02)
+        other = replace(sensor, tof=.5, timestamp=.02)
         learner.table[observation_state(sensor, None, None)] = [2, 0]
         learner.table[observation_state(other, None, None)] = [0, 2]
         brain = QLearningBrain(learner)
@@ -210,7 +302,7 @@ class ReinforcementLearningTests(unittest.TestCase):
 
         state = observation_state(sensor, target, obstacle=None)
 
-        self.assertEqual(state, ("target_right", "clear", "small", "clear", "clear", "clear", "stalled", "no_contact", "no_contact", "none", "none", "none"))
+        self.assertEqual(state, ("target_right", "clear", "small", "clear", "clear", "clear", "stalled", "no_contact", "no_contact"))
 
     def test_policy_state_distinguishes_the_side_that_needs_an_escape_turn(self):
         sensor = SensorFrame(np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((2, 2), dtype=np.uint8),

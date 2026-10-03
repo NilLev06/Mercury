@@ -34,6 +34,9 @@ def load_training_agent(output: str | Path, *, seed: int, epsilon: float) -> QLe
                 backup = output.with_name(output.name + f'.v{version}.{index}.bak')
                 index += 1
             shutil.copy2(output, backup)
+            if version == 5:
+                print(f'Old policy preserved: {backup}. Migrating compact observations.',flush=True)
+                return QLearningAgent.load(output,epsilon=epsilon,seed=seed)
             print(f'Old policy preserved: {backup}. Starting new observation schema.', flush=True)
             return QLearningAgent(epsilon=epsilon, seed=seed)
         return QLearningAgent.load(output, epsilon=epsilon, seed=seed)
@@ -92,6 +95,7 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
             for sequence in range(1, steps + 1):
                 if remaining == 0:
                     action = controller.choose(state, explore=True)
+                    window_learnable = not controller.overriding
                     window_state = state
                     window_reward = 0.0
                     remaining = max(1, round(ACTION_DURATION / env.drive.timestep))
@@ -101,7 +105,9 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 next_sensor = env.sensor_frame()
                 next_target = target_detector.detect(next_sensor, "red_ball")
                 next_obstacle = obstacle_detector.detect(next_sensor, "obstacle")
+                old_phase = controller.recovery.phase
                 next_state = controller.observe(next_sensor, next_target, next_obstacle)
+                phase_changed = old_phase != controller.recovery.phase
                 reached = env.goal_distance() <= env.sim_cfg.goal_radius
                 moved = abs(next_sensor.encoder_delta) >= 0.001
                 reward = reward_model.step(env.car_pose()[:2], moved=moved,
@@ -114,8 +120,11 @@ def train_q_learning(*, episodes: int, steps: int, output: str | Path,
                 stalled_seconds += float(not moved) * env.drive.timestep
                 window_reward += reward
                 remaining -= 1
-                if remaining == 0 or reached or sequence == steps:
-                    agent.update(window_state, action, window_reward, next_state, terminal=reached)
+                if remaining == 0 or reached or sequence == steps or phase_changed:
+                    if window_learnable:
+                        agent.update(window_state, action, window_reward, next_state,
+                                     terminal=reached or controller.recovery.phase != 'drive')
+                    remaining = 0
                 sensor, state = next_sensor, next_state
                 total += reward
                 if emit is not None:
