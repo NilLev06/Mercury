@@ -52,6 +52,7 @@ def main():
             if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
                 webbrowser.open(f'http://{dashboard.address[0]}:{dashboard.address[1]}/')
         with mujoco.viewer.launch_passive(env.m, env.d) as viewer:
+            viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_RANGEFINDER] = True
             viewer.cam.azimuth, viewer.cam.elevation, viewer.cam.distance = -30, -55, 5.5
             for episode in range(args.max_episodes):
                 if not alive(viewer):

@@ -20,6 +20,7 @@ def build_model_xml(cfg: SimConfig, drive: DriveConfig, obstacles, goal, steer_a
     wr = drive.wheel_radius
     wb = drive.wheelbase
     body_center = wb / 2
+    edge = tr + .022
     return f"""<mujoco model="flybraincare">
   <compiler angle="radian" coordinate="local" autolimits="true"/>
   <option timestep="{drive.timestep}" gravity="0 0 -9.81" integrator="Euler"/>
@@ -59,9 +60,12 @@ def build_model_xml(cfg: SimConfig, drive: DriveConfig, obstacles, goal, steer_a
         <joint name="wheel_rr" type="hinge" axis="0 1 0"/>
         <geom type="cylinder" size="{wr} 0.022" zaxis="0 1 0" rgba="0.12 0.12 0.12 1" friction="0.5 0.01 0.01"/>
       </body>
-      <site name="sF_L" pos="{wb + 0.04:.3f} 0.08 0.12" size="0.006" xyaxes="-0.5 0.874 0 0 0 1"/>
-      <site name="sF_R" pos="{wb + 0.04:.3f} -0.08 0.12" size="0.006" xyaxes="0.5 0.874 0 0 0 1"/>
+      <site name="sF_L" pos="{wb + 0.04:.3f} {edge:.3f} 0.12" size="0.006" zaxis="1 1 0"/>
+      <site name="sF_R" pos="{wb + 0.04:.3f} {-edge:.3f} 0.12" size="0.006" zaxis="1 -1 0"/>
       <site name="sF_C" pos="{wb + 0.04:.3f} 0 0.12" size="0.006" xyaxes="0 1 0 0 0 1"/>
+      <site name="sS_L" pos="{body_center:.3f} {edge:.3f} 0.12" size="0.006" zaxis="0 1 0"/>
+      <site name="sS_R" pos="{body_center:.3f} {-edge:.3f} 0.12" size="0.006" zaxis="0 -1 0"/>
+      <site name="sR_C" pos="-0.04 0 0.12" size="0.006" zaxis="-1 0 0"/>
       <site name="sO" pos="{body_center:.3f} 0 0.05" size="0.01"/>
       <camera name="eye" pos="{wb * 0.7:.3f} 0 0.12" xyaxes="0 1 0 0 0 -1" mode="fixed" fovy="75"/>
     </body>
@@ -74,6 +78,9 @@ def build_model_xml(cfg: SimConfig, drive: DriveConfig, obstacles, goal, steer_a
     <rangefinder name="b_fl" site="sF_L" cutoff="1.2"/>
     <rangefinder name="b_fr" site="sF_R" cutoff="1.2"/>
     <rangefinder name="b_fc" site="sF_C" cutoff="1.2"/>
+    <rangefinder name="b_sl" site="sS_L" cutoff="1.2"/>
+    <rangefinder name="b_sr" site="sS_R" cutoff="1.2"/>
+    <rangefinder name="b_rc" site="sR_C" cutoff="1.2"/>
     <gyro name="gyro" site="sO"/>
   </sensor>
   <asset>

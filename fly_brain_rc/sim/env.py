@@ -115,6 +115,9 @@ class FlyCarEnv:
         self.adr_b_fl = take(m.sensor("b_fl").adr)
         self.adr_b_fr = take(m.sensor("b_fr").adr)
         self.adr_b_fc = take(m.sensor("b_fc").adr)
+        self.adr_b_sl = take(m.sensor("b_sl").adr)
+        self.adr_b_sr = take(m.sensor("b_sr").adr)
+        self.adr_b_rc = take(m.sensor("b_rc").adr)
         self.adr_gyro = take(m.sensor("gyro").adr)
         self.adr_wl = m.jnt_dofadr[m.joint("wheel_rl").id]
         self.adr_wr = m.jnt_dofadr[m.joint("wheel_rr").id]
@@ -196,8 +199,7 @@ class FlyCarEnv:
             raise RuntimeError("sensor_frame requires a camera renderer")
         self.renderer.update_scene(self.d, camera="eye")
         rgb = np.asarray(self.renderer.render(), dtype=np.uint8)
-        center_range = float(self.d.sensordata[self.adr_b_fc])
-        tof = center_range if 0.0 < center_range < 1.2 else 1.2
+        tof = self._range_reading(self.adr_b_fc)
         yaw_rate = (
             self._w_cmd_prev if self.sim_cfg.kinematic
             else float(self.d.sensordata[self.adr_gyro + 2])
@@ -220,11 +222,14 @@ class FlyCarEnv:
             range_right=self._range_reading(self.adr_b_fr),
             contact_front=self._contact_front,
             contact_rear=self._contact_rear,
+            range_side_left=self._range_reading(self.adr_b_sl),
+            range_side_right=self._range_reading(self.adr_b_sr),
+            range_rear=self._range_reading(self.adr_b_rc),
         )
 
     def _range_reading(self, address):
         value = float(self.d.sensordata[address])
-        return value if 0.0 < value < 1.2 else 1.2
+        return value if 0.0 <= value < 1.2 else 1.2
 
     def apply(self, command: ActuatorCommand) -> None:
         self.step(command.traction, command.steering, observe=False)

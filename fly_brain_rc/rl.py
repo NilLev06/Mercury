@@ -131,13 +131,20 @@ class QLearningAgent:
         self.table: dict[tuple[str, ...], list[float]] = {}
         self.training_runs = 0
         self.task = 'navigation'
+        self.sensor_schema = 1
         self.legacy_inference = False
 
     def values(self, state):
         state = tuple(state)
-        if state not in self.table and state[0].startswith('target_memory_'):
-            state = (state[0].replace('target_memory_','target_',1),)+state[1:]
-        return self.table.get(state, [0.0] * len(self.actions))
+        candidates = [state]
+        if state[0].startswith('target_memory_'):
+            candidates.append((state[0].replace('target_memory_','target_',1),)+state[1:])
+        if self.task == 'bypass-v1' and len(state)==10:
+            candidates += [key[:9] for key in candidates]
+        for key in candidates:
+            if key in self.table:
+                return self.table[key]
+        return [0.0] * len(self.actions)
 
     def _values(self, state: tuple[str, ...]) -> list[float]:
         return self.table.setdefault(tuple(state), list(self.values(state)))
@@ -199,6 +206,7 @@ class QLearningAgent:
             "gamma": self.gamma, "epsilon": self.epsilon,
             "training_runs": self.training_runs,
             "task": self.task,
+            "sensor_schema": self.sensor_schema,
             "table": {"|".join(state): values for state, values in self.table.items()},
         }
         path = Path(path)
@@ -247,6 +255,7 @@ class QLearningAgent:
             agent.table[state] = estimates
         agent.training_runs = int(payload.get("training_runs", 0))
         agent.task = payload.get('task','navigation')
+        agent.sensor_schema = int(payload.get('sensor_schema',1))
         if agent.task not in ('navigation','bypass-v1'):
             raise ValueError('unsupported policy task')
         agent.legacy_inference = False
@@ -301,6 +310,11 @@ class RLController:
         state = observation_state(sensor,effective,obstacle)
         if target is None and effective is not None:
             state = (state[0].replace('target_','target_memory_',1),)+state[1:]
+        if self.agent.task == 'bypass-v1':
+            left,right = sensor.range_side_left < .25,sensor.range_side_right < .25
+            side = 'both' if left and right else 'left' if left else 'right' if right else 'clear'
+            rear = 'near' if sensor.range_rear < .35 else 'clear'
+            state += (f'side_{side}:rear_{rear}',)
         return state
 
     def choose(self, state, *, explore):

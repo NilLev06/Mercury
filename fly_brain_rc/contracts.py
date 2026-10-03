@@ -22,6 +22,9 @@ class SensorFrame:
     range_right: float = 1.2
     contact_front: bool = False
     contact_rear: bool = False
+    range_side_left: float = 1.2
+    range_side_right: float = 1.2
+    range_rear: float = 1.2
 
 
 @dataclass(frozen=True)

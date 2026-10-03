@@ -84,6 +84,8 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
             shutil.copy2(output,backup)
     cases = bypass_cases(seed if evaluate else seed+agent.training_runs*10_007,
                          episodes,held_out=evaluate)
+    if not evaluate:
+        agent.sensor_schema = 2
     detector, obstacles = MockRedBallDetector(),MockBlueObstacleDetector()
     totals,successes = [],0
     cancelled = False
@@ -149,7 +151,7 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
             env.renderer.close()
         totals.append(total)
         successes += int(reached)
-        report = dict(task='bypass-v1',run=run,episode=index+1,seed=case.seed,
+        report = dict(task='bypass-v1',sensor_schema=2,run=run,episode=index+1,seed=case.seed,
                       evaluation=evaluate,success=reached,cancelled=cancelled,
                       steps=applied_steps,reward=total,contacts=env.collisions,
                       contact_seconds=contacts*DRIVE.timestep,minimum_final_distance=env.goal_distance())

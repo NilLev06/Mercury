@@ -13,10 +13,11 @@ body{margin:18px;font-size:13px;background:#18251f;color:#edf2e9}h1{font-size:20
 <p id="mission">Loading mission…</p><main>
 <section><h2>Camera and target</h2><canvas id="camera" width="640" height="480"></canvas><p id="observation"></p></section>
 <section><h2>Compass ring</h2><canvas id="ring" width="320" height="320"></canvas><h2>Populations</h2><div id="population"></div></section>
-<section><h2>Sensors and motion</h2><pre id="sensor"></pre><h2>Motor output</h2><pre id="motor"></pre><small>Outputs are read-only. Mission buttons are the only controls.</small></section>
+<section><h2>Дальномеры · 6 направлений</h2><canvas id="ranges" width="320" height="260" aria-label="Схема шести дальномеров"></canvas><p id="range-values"></p><small>Идеальные лучи MuJoCo. Схема показывает направления и измеренные расстояния, не карту.</small><h2>Sensors and motion</h2><pre id="sensor"></pre><h2>Motor output</h2><pre id="motor"></pre><small>Outputs are read-only. Mission buttons are the only controls.</small></section>
 </main>
 <script>
 const el=id=>document.getElementById(id), camera=el('camera').getContext('2d'), ring=el('ring').getContext('2d');
+function drawRanges(s){const ctx=el('ranges').getContext('2d');ctx.clearRect(0,0,320,260);ctx.fillStyle='#486451';ctx.fillRect(142,105,36,62);ctx.fillStyle='#dcec9c';ctx.fillRect(153,100,14,4);ctx.font='11px system-ui';const rays=[['Ц',s.tof,0,160,105],['ДЛ',s.range_left,-Math.PI/4,142,105],['ДП',s.range_right,Math.PI/4,178,105],['Л',s.range_side_left,-Math.PI/2,142,135],['П',s.range_side_right,Math.PI/2,178,135],['З',s.range_rear,Math.PI,160,167]];for(const [label,raw,a,x,y] of rays){const d=Number.isFinite(raw)?raw:1.2,len=12+Math.min(1.2,Math.max(0,d))*55;ctx.strokeStyle=d<.25?'#ef947c':d<.6?'#e4c581':'#91cda1';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.sin(a)*len,y-Math.cos(a)*len);ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.fillText(label,x+Math.sin(a)*(len+12)-4,y-Math.cos(a)*(len+12));}el('range-values').textContent=rays.map(([label,value])=>`${label}: ${Number.isFinite(value)?value.toFixed(2):'—'} м`).join(' · ');}
 async function command(path,body){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const state=await r.json();if(!r.ok)throw Error(state.error);mission(state)}catch(e){el('mission').textContent=e.message}}
 el('start').onclick=()=>command('/api/mission/start',{target_class:el('target').value});
 el('stop').onclick=()=>command('/api/mission/stop',{});
@@ -24,6 +25,7 @@ function mission(m){el('start').disabled=el('stop').disabled=!!m.training;if(m.t
 fetch('/api/state').then(r=>r.json()).then(mission);
 const events=new EventSource('/api/telemetry');events.onopen=()=>el('connection').textContent='connected';events.onerror=()=>el('connection').textContent='reconnecting';
 events.onmessage=e=>{const d=JSON.parse(e.data);mission(d.mission);const b=d.brain,s=d.sensor,t=d.target;
+ drawRanges(s);
  if(d.preview){const image=new Image();image.onload=()=>{camera.drawImage(image,0,0,640,480);const overlay=d.preview_target;if(overlay){const [x,y,right,bottom]=overlay.bbox;camera.strokeStyle='#ffcb5b';camera.lineWidth=3;camera.strokeRect(x*640,y*480,(right-x)*640,(bottom-y)*480)}};image.src=d.preview}
  el('observation').textContent=t?`${t.class_name} · confidence ${t.confidence.toFixed(2)} · bearing ${t.bearing.toFixed(3)} · area ${t.apparent_area.toFixed(3)}`:'Target not visible';
  ring.clearRect(0,0,320,320);const values=b.compass_ring, n=values.length, max=Math.max(...values,1e-6);values.forEach((v,i)=>{const a=2*Math.PI*i/n-Math.PI/2;ring.beginPath();ring.strokeStyle='#62d8ba';ring.lineWidth=5;ring.moveTo(160+50*Math.cos(a),160+50*Math.sin(a));ring.lineTo(160+(50+85*v/max)*Math.cos(a),160+(50+85*v/max)*Math.sin(a));ring.stroke()});
