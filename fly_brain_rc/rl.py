@@ -6,7 +6,7 @@ to assign exploration reward; it is never part of the learned policy state.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import random
@@ -139,14 +139,7 @@ class QLearningAgent:
         candidates = [state]
         if state[0].startswith('target_memory_'):
             candidates.append((state[0].replace('target_memory_','target_',1),)+state[1:])
-        if self.task == 'bypass-v1' and self.sensor_schema >= 3 and len(state)==12:
-            # Old policy never learned parking. Transfer driving experience
-            # only outside the new near-target task, preserving the old rows.
-            if state[10] in ('far','unseen','uncertain'):
-                for key in list(candidates):
-                    legacy = tuple('blocked' if v == 'critical' else v for v in key[:10])
-                    candidates.extend((legacy,legacy[:9]))
-        elif self.task == 'bypass-v1' and len(state)==10:
+        if self.task == 'bypass-v1' and len(state)==10:
             candidates += [key[:9] for key in candidates]
         for key in candidates:
             if key in self.table:
@@ -162,15 +155,12 @@ class QLearningAgent:
     def admissible_actions(self, state):
         # Geometry contacts act as directional bumpers; failed travel also stays
         # inhibited until encoder progress, even after a contact flickers off.
-        failed = state[10] if self.task != 'bypass-v1' and len(state) > 10 else 'none'
+        failed = state[10] if len(state) > 10 else 'none'
         bumper = state[8] if len(state) > 8 else 'no_contact'
-        blocked_action = int(state[11]) if self.task != 'bypass-v1' and len(state) > 11 and state[11] != 'none' else None
+        blocked_action = int(state[11]) if len(state) > 11 and state[11] != 'none' else None
         admissible = [i for i,(t,_) in enumerate(self.actions)
                       if not (t > 0 and (bumper == 'contact_front' or failed == 'forward_failed'))
                       and not (t < 0 and (bumper == 'contact_rear' or failed == 'reverse_failed'))]
-        if self.task == 'bypass-v1' and self.sensor_schema >= 3:
-            admissible = [i for i in admissible if self.actions[i][0] != 0
-                          or (len(state)==12 and state[10]=='park')]
         if not admissible:
             # Conflicting stale failure and current bumper: the bumper wins.
             permitted = [i for i,(t,_) in enumerate(self.actions)
@@ -184,32 +174,23 @@ class QLearningAgent:
 
     def choose(self, state: tuple[str, ...], *, explore: bool = True) -> int:
         admissible = self.admissible_actions(state)
-        failed = state[10] if self.task != 'bypass-v1' and len(state) > 10 else 'none'
+        failed = state[10] if len(state) > 10 else 'none'
         bumper = state[8] if len(state) > 8 else 'no_contact'
         if explore and self._rng.random() < self.epsilon:
             return self._rng.choice(admissible)
         values = self.values(state)
         best = max(values[i] for i in admissible)
         candidates = [i for i in admissible if values[i] == best]
-        if self.task == 'bypass-v1' and self.sensor_schema >= 3 and len(state)==12:
-            stop = self.actions.index((0.0,0.0))
-            if state[10]=='park' and stop in candidates:
-                return stop
         # Deterministic, low-speed fallback toward a visible target or a free
         # side. With no target, keep a gentle search turn, not blind reversing.
         target_direction = state[0].replace('target_memory_','target_',1)
         steer = -0.65 if target_direction == 'target_left' else .65 if target_direction == 'target_right' else 0.0
-        target_center_ray = self.task == 'bypass-v1' and len(state)==12 and state[11][1]=='1'
-        if (state[4] in ('blocked','critical') and not target_center_ray) or state[1] == 'obstacle_center':
-            rank = {'critical': -1, 'blocked': 0, 'near': 1, 'clear': 2}
+        if state[4] == 'blocked' or state[1] == 'obstacle_center':
+            rank = {'blocked': 0, 'near': 1, 'clear': 2}
             steer = -.65 if rank[state[3]] > rank[state[5]] else .65
         elif state[0] == 'target_none':
             steer = -.65 if state[1] == 'obstacle_right' else .65
         preferred_traction = -.7 if bumper == 'contact_front' or failed == 'forward_failed' else .3
-        if self.task == 'bypass-v1' and len(state)==12 and state[10] == 'near' and abs(steer)<.1:
-            preferred_traction = .12
-        if self.task == 'bypass-v1' and len(state)==12 and state[10] == 'too_close':
-            preferred_traction = -.7
         return min(candidates, key=lambda i: (abs(self.actions[i][0]-preferred_traction),
                                              abs(self.actions[i][1]-steer), i))
 
@@ -334,13 +315,6 @@ class RLController:
             side = 'both' if left and right else 'left' if left else 'right' if right else 'clear'
             rear = 'near' if sensor.range_rear < .35 else 'clear'
             state += (f'side_{side}:rear_{rear}',)
-            if self.agent.sensor_schema >= 3:
-                from .docking import target_view
-                view = target_view(sensor,target)
-                state = tuple('critical' if i in (3,4,5) and value < .08 else v
-                              for i,(v,value) in enumerate(zip(state,
-                                  (1.2,1.2,1.2,sensor.range_left,sensor.tof,sensor.range_right,1.2,1.2,1.2,1.2))))
-                state += (view.stage,''.join('1' if hit else '0' for hit in view.rays))
         return state
 
     def choose(self, state, *, explore):
@@ -364,8 +338,6 @@ class QLearningBrain:
 
     def __init__(self, agent: QLearningAgent):
         self.agent = agent
-        from .docking import prepare_docking
-        prepare_docking(agent)
         self.reset()
 
     def reset(self):
@@ -396,11 +368,4 @@ class QLearningBrain:
             motor_forward=max(0.0, traction), motor_reverse=max(0.0, -traction),
             traction=traction, steering=steering,
         )
-        if self.agent.task == 'bypass-v1' and self.agent.sensor_schema >= 3:
-            from .docking import target_view
-            view = target_view(sensor,target)
-            telemetry = replace(telemetry, populations={
-                **telemetry.populations, 'target_distance_estimate': view.distance or 0,
-                'target_center_ray_match': float(view.rays[1]),
-                'target_parking_zone': float(view.parking)})
         return command, telemetry

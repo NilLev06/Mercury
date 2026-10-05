@@ -67,7 +67,7 @@ class BypassTests(unittest.TestCase):
             train_bypass(episodes=1,steps=10,output=path,evaluate=True)
             self.assertEqual(path.read_bytes(),before)
 
-    def test_viewer_bypass_requires_parking_not_merely_goal_radius(self):
+    def test_viewer_bypass_reach_finishes_without_claiming_learned_stop(self):
         from unittest.mock import patch
         from tests.test_environment import HeadlessRenderer
         from fly_brain_rc.config import SIM, DRIVE
@@ -83,6 +83,8 @@ class BypassTests(unittest.TestCase):
             mission = MissionController(running=True)
             runtime = FlyRuntime(env,QLearningBrain(a),mission=mission,bypass_evaluation=True)
             record = runtime.tick()
-            self.assertEqual(mission.state()['status'],'running')
-            self.assertIsNone(mission.state()['result'])
+            self.assertEqual(mission.state()['status'],'finished')
+            self.assertTrue(mission.state()['result']['goal_reached'])
+            self.assertFalse(mission.state()['result']['stable_arrival'])
+            self.assertEqual(record.command.traction,0)
             env.renderer.close()
