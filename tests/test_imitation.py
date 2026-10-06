@@ -39,6 +39,27 @@ class ObservationTests(unittest.TestCase):
 
 
 class TeacherTests(unittest.TestCase):
+    def test_teacher_can_escape_when_only_tracking_margin_touches_cylinder(self):
+        from fly_brain_rc.imitation.teacher import BicycleTeacher
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        from fly_brain_rc.sim.scenarios import Scenario,BLUE
+        env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('tight',(((0,.49),BLUE),),(2.35,0)),render=False)
+        self.assertFalse(env._pose_collides(env.state))
+        teacher = BicycleTeacher(env)
+        for _ in range(100):
+            env.step(*teacher.action(),observe=False)
+        self.assertGreater(env.car_pose()[0],.25)
+        self.assertEqual(env.collisions,0)
+
+    def test_camera_near_plane_does_not_cut_through_contact_surface(self):
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        from fly_brain_rc.sim.scenarios import Scenario,BLUE
+        env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('occlusion',(((1,0),BLUE),),(2,0)),render=False)
+        # Front footprint touches x=.72; eye at x=.626 leaves .094m.
+        self.assertLess(env.m.stat.extent*env.m.vis.map.znear,.094)
+
     def test_dagger_teacher_replans_after_displacement_without_contact(self):
         from fly_brain_rc.imitation.teacher import BicycleTeacher
         from fly_brain_rc.config import DRIVE,SIM

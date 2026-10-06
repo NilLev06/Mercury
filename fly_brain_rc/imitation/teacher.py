@@ -12,10 +12,10 @@ class BicycleTeacher:
         self.path = self._plan()
         self.cursor = 0
 
-    def _safe(self, state):
+    def _safe(self, state, margin=.045):
         # The environment's exact chassis + outer wheel footprint, with a
         # modest lateral tracking margin. Goal sphere is not an obstacle.
-        for lateral in (-.045,0,.045):
+        for lateral in (-margin,0,margin):
             shifted = BicycleState(state.x-math.sin(state.yaw)*lateral,
                                    state.y+math.cos(state.yaw)*lateral,state.yaw)
             if self.env._pose_collides(shifted):
@@ -25,6 +25,10 @@ class BicycleTeacher:
     def _plan(self):
         env = self.env
         start = env.car_pose()
+        # A student's legal contact pose can already violate the optional
+        # tracking margin. Requiring that margin on the first escape sample
+        # traps the planner. Recovery still checks the full wheel footprint.
+        margin = .045 if self._safe(BicycleState(*start)) else 0.0
         goal = env.goal
         def distance(p):
             return math.hypot(goal[0]-p[0]-env.drive.wheelbase/2*math.cos(p[2]),
@@ -54,7 +58,7 @@ class BicycleTeacher:
                         y += ds*math.sin(middle)
                         yaw = (yaw+curvature*ds+math.pi)%(2*math.pi)-math.pi
                         state = BicycleState(x,y,yaw)
-                        if not self._safe(state):
+                        if not self._safe(state,margin):
                             break
                         samples.append((x,y,yaw,direction,steering))
                     if len(samples) != 8:

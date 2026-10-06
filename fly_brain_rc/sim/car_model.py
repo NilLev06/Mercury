@@ -24,6 +24,9 @@ def build_model_xml(cfg: SimConfig, drive: DriveConfig, obstacles, goal, steer_a
     return f"""<mujoco model="flybraincare">
   <compiler angle="radian" coordinate="local" autolimits="true"/>
   <option timestep="{drive.timestep}" gravity="0 0 -9.81" integrator="Euler"/>
+  <!-- znear scales with scene extent: default clips ~13cm here, beyond
+       the eye-to-bumper gap. Keep close opaque obstacles in the image. -->
+  <visual><map znear="0.0001"/></visual>
   <default>
     <geom type="box" density="1500"/>
     <joint damping="0.05"/>
