@@ -14,7 +14,7 @@ from .connectome import prepare_graph
 from .model import RecurrentPolicy,load_checkpoint,save_checkpoint
 from .observations import encode_observation
 from .teacher import BicycleTeacher
-from .training import fit_demonstrations,mix_action
+from .training import fit_demonstrations,mix_action,teacher_probability
 
 
 def experiment_case(seed,index,*,held_out=False):
@@ -140,7 +140,7 @@ def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
                 if viewer:
                     import mujoco.viewer as mj_viewer
                     live_viewer = mj_viewer.launch_passive(env.m,env.d)
-                beta = None if evaluate else (1.0 if iteration<6 else .5 if iteration<12 else .2 if iteration<24 else 0.0)
+                beta = None if evaluate else teacher_probability(iteration)
                 if progress:
                     progress(local_index+1,episodes,0,len(data))
                 trajectory,report = collect_episode(env,model,steps=steps,beta=beta,emit=emit,

@@ -119,6 +119,44 @@ class NetworkTests(unittest.TestCase):
 
 
 class TrainingTests(unittest.TestCase):
+    def test_teacher_help_recurs_after_introductory_stage(self):
+        from fly_brain_rc.imitation.training import teacher_probability
+        cases = ((0,1),(5,1),(6,.5),(11,.5),(12,.2),(23,.2),
+                 (24,1),(25,1),(26,.5),(27,.5),(28,0),(29,0),
+                 (42,1),(43,1),(44,.5),(45,.5),(46,0),(47,0),(48,1))
+        for iteration,expected in cases:
+            with self.subTest(iteration=iteration):
+                self.assertEqual(teacher_probability(iteration),expected)
+
+    def test_resumed_training_uses_global_cycle_and_preserves_replay(self):
+        import torch
+        from unittest.mock import patch
+        from fly_brain_rc.imitation.runner import run_experiment
+        from fly_brain_rc.imitation.model import RecurrentPolicy,save_checkpoint,load_checkpoint
+        from fly_brain_rc.contracts import SensorFrame
+        from fly_brain_rc.sim.env import FlyCarEnv
+        graph = NetworkTests().graph()
+        def env_factory(*args,**kwargs):
+            kwargs['render'] = False
+            env = FlyCarEnv(*args,**kwargs)
+            env.sensor_frame = lambda: SensorFrame(np.zeros((4,4,3),np.uint8),np.zeros((4,4),np.uint8),0,0,1.2,False,0,speed=env.speed)
+            return env
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'network.pt'
+            model = RecurrentPolicy(graph)
+            model.training_metadata = {'seeds':[7],'cases':['previous']}
+            old_data = [(torch.ones(2,19),torch.zeros(2,2))]
+            save_checkpoint(path,model,torch.optim.Adam(model.parameters()),old_data,43)
+            with patch('fly_brain_rc.imitation.runner.prepare_graph',return_value=graph),patch('fly_brain_rc.imitation.runner.FlyCarEnv',side_effect=env_factory):
+                result = run_experiment(output=path,episodes=6,steps=1,updates=0,seed=7)
+            self.assertEqual([r['teacher_beta'] for r in result['reports']],[1,.5,.5,0,0,1])
+            restored,_,data,iteration = load_checkpoint(path,graph)
+            self.assertEqual(iteration,49)
+            self.assertEqual(len(data),7)
+            self.assertTrue(torch.equal(data[0][0],old_data[0][0]))
+            self.assertEqual(restored.training_metadata['seeds'],[7])
+            self.assertEqual(restored.training_metadata['cases'][0],'previous')
+
     def test_partial_episode_does_not_reduce_all_training_context_to_one_step(self):
         import torch
         from fly_brain_rc.imitation.model import RecurrentPolicy

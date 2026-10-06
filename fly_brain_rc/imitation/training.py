@@ -2,6 +2,18 @@
 import torch
 
 
+def teacher_probability(iteration):
+    """Assistance follows checkpoint age, including recurring full routes."""
+    if iteration < 6:
+        return 1.0
+    if iteration < 12:
+        return .5
+    if iteration < 24:
+        return .2
+    # Each pair covers both straight and cylinder training maps.
+    return (1.0,1.0,.5,.5,0.0,0.0)[(iteration-24)%6]
+
+
 def mix_action(teacher,student,beta):
     if not 0 <= beta <= 1:
         raise ValueError('invalid teacher mixing probability')
