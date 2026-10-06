@@ -30,3 +30,18 @@ Do not train during validation, promote cancelled suites or touch old Q memories
 - [ ] Runner performs initial validation and every 12 iterations, emitting `phase=validation` with nested result.
 - [ ] Lab test jobs use existing `.best.pt`; training keeps original path. Test argv behaviour.
 - [ ] Explain latest versus best in README, run full suite and a resumed disposable smoke check, commit scoped files.
+
+## Execution notes
+
+Canonical teacher check: 5/5 successful with zero contacts. Recovery starts
+at (.72,-.22) failed teacher tracking and were replaced with verified
+(.65,-.30) starts, with optional 90-degree heading and mirrored layouts.
+The anatomical model's original 107-episode checkpoint remains unchanged.
+On its disposable copy, initial autonomous validation reproduced 4/7;
+training resumed to 108 and repeated selection without resetting replay.
+The post-update result was also 4/7, with different successful maps: no
+robust improvement is claimed from this single-update smoke check.
+Contact-route caching reduced the blocked rollout collection to 0.76s
+while retaining the same 480 labels and observed student behaviour.
+Read-only review found no remaining important issues; CLI explicit output
+paths intentionally remain exact, while lab tests automatically use best.

@@ -40,6 +40,9 @@ def build_job(root, request):
     command = [sys.executable,str(root/'run.py')]
     if mode.startswith('imitation_'):
         path = root/'artifacts/imitation'/('rnn.pt' if baseline else 'connectome.pt')
+        best = path.with_name(path.stem+'.best.pt')
+        if mode != 'imitation_train' and best.exists():
+            path = best
         if mode != 'imitation_train' and not path.exists():
             raise ValueError('Сначала обучи выбранную imitation-модель.')
         command += ['train-imitation' if mode=='imitation_train' else 'test-imitation',
@@ -78,6 +81,8 @@ class JobManager:
         self.cancel_file = None
         self.started = None
         self.result = None
+        self.validation = None
+        self.validation_active = False
         self.series = deque(maxlen=300)
         self.stop_done = Event()
         self.stop_done.set()
@@ -99,6 +104,8 @@ class JobManager:
             self.logs.clear()
             self.series.clear()
             self.result = None
+            self.validation = None
+            self.validation_active = False
             self.exit_code = None
             self.mode = request['mode']
             self.started = time.time()
@@ -119,6 +126,11 @@ class JobManager:
                         report = json.loads(line)
                         if isinstance(report,dict) and 'episode' in report and 'reward' in report:
                             self.series.append(report)
+                        elif isinstance(report,dict) and report.get('phase')=='validation_start':
+                            self.validation_active = True
+                        elif isinstance(report,dict) and report.get('phase')=='validation':
+                            self.validation = report['validation']
+                            self.validation_active = False
                         elif isinstance(report,dict) and 'successes' in report:
                             self.result = report
                     except (ValueError,TypeError):
@@ -126,6 +138,7 @@ class JobManager:
             code = process.wait()
             with self.lock:
                 self.exit_code = code
+                self.validation_active = False
                 stopping = self.status=='stopping'
                 if not stopping:
                     self.status = 'finished' if code==0 else 'error'
@@ -189,7 +202,8 @@ class JobManager:
         return dict(app='digital-fly-lab',status=self.status,mode=self.mode,
                     started=self.started,exit_code=self.exit_code,logs=list(self.logs),
                     worker_port=self.worker_port,
-                    result=self.result,series=list(self.series),
+                    result=self.result,series=list(self.series),validation=self.validation,
+                    validation_active=self.validation_active,
                     policies={name:(self.root/'artifacts/rl'/file).exists() for name,file in
                               (('bypass','bypass-policy.json'),('general','q-policy.json'))})
 

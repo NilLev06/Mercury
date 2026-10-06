@@ -6,6 +6,24 @@ import sys
 
 
 class LabTests(unittest.TestCase):
+    def test_validation_is_shown_separately_from_training_result(self):
+        import json
+        from unittest.mock import patch
+        from fly_brain_rc.dashboard.lab import JobManager
+        report = {'phase':'validation','validation':{'successes':4,'episodes':7,'promoted':True,'iteration':108}}
+        script = 'print('+repr(json.dumps(report))+',flush=True)'
+        with tempfile.TemporaryDirectory() as directory,patch('fly_brain_rc.dashboard.lab.build_job',return_value=[sys.executable,'-c',script]):
+            manager = JobManager(directory)
+            try:
+                manager.start({'mode':'imitation_train'})
+                manager.thread.join(timeout=3)
+                state = manager.state()
+                self.assertEqual(state['validation'],report['validation'])
+                self.assertIsNone(state['result'])
+                self.assertEqual(state['series'],[])
+            finally:
+                manager.close()
+
     def test_imitation_jobs_are_separate_and_baseline_is_strict_boolean(self):
         from fly_brain_rc.dashboard.lab import build_job
         root = Path('/tmp/project')

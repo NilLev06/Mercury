@@ -1,29 +1,21 @@
 """Shared imitation collection, held-out evaluation and live telemetry."""
 import json
 from pathlib import Path
-import random
 import time
 import torch
 from ..config import DRIVE,SIM
 from ..contracts import ActuatorCommand,BrainTelemetry,RuntimeTelemetry,MotionObservation
 from ..perception.target import MockRedBallDetector,MockBlueObstacleDetector
 from ..sim.env import FlyCarEnv
-from ..sim.scenarios import Scenario,BLUE,get_scenario
+from ..sim.scenarios import get_scenario
 from .arrival import GoalStop,body_goal_distance
 from .connectome import prepare_graph
 from .model import RecurrentPolicy,load_checkpoint,save_checkpoint
 from .observations import encode_observation
 from .teacher import BicycleTeacher
 from .training import fit_demonstrations,mix_action,teacher_probability
-
-
-def experiment_case(seed,index,*,held_out=False):
-    # String namespace for evaluation cannot coincide with any integer seed
-    # used for training. The index is independent of model age.
-    rng = random.Random(f'held-out:{seed}:{index}' if held_out else seed+index*104729)
-    goal = rng.uniform(1.9,2.55),rng.uniform(-.35,.35)
-    obstacles = () if index%2==0 else (((rng.uniform(.9,1.3),rng.choice((-1,1))*rng.uniform(.1,.35)),BLUE),)
-    return Scenario(f'imitation-{"eval" if held_out else "train"}-{seed}-{index}',obstacles,goal)
+from .curriculum import experiment_case,training_case,place_start
+from .validation import validate,previous_validation,promote_best
 
 
 def fit_paired_replay(graph,trajectories,*,updates=100,seed=0):
@@ -102,9 +94,12 @@ def collect_episode(env,model,*,steps,beta=None,emit=None,progress=None,
 
 def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
                    baseline=False,updates=100,data_directory='.local/connectome',
-                   emit=None,progress=None,cancel=None,scenario=None,viewer=False,mission=None):
+                   emit=None,progress=None,cancel=None,scenario=None,viewer=False,mission=None,
+                   validation_interval=12):
     if type(episodes) is not int or episodes<1 or type(steps) is not int or steps<1:
         raise ValueError('positive episode and step counts required')
+    if type(validation_interval) is not int or validation_interval<0:
+        raise ValueError('nonnegative validation interval required')
     torch.set_num_threads(2)
     torch.manual_seed(seed)
     graph = prepare_graph(data_directory)
@@ -124,19 +119,35 @@ def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
     print(json.dumps({'phase':'loaded','baseline':baseline,'graph':graph['manifest'],
                       'student_inputs':'camera CV + six ranges + ego motion; no hidden goal coordinates'},ensure_ascii=False),flush=True)
     reports = []
+    validations = []
     interrupted = False
+    def assess():
+        print(json.dumps({'phase':'validation_start','iteration':iteration}),flush=True)
+        assessment = validate(model,steps=steps,cancel=cancel,emit=emit)
+        promoted = promote_best(path,model,optimizer,data,iteration,assessment)
+        validations.append(dict(assessment,iteration=iteration,promoted=promoted))
+        print(json.dumps({'phase':'validation','validation':validations[-1]},allow_nan=False),flush=True)
+        return assessment['cancelled']
     try:
+        if not evaluate and validation_interval and previous_validation(path,model,steps) is None:
+            interrupted = assess()
         for local_index in range(episodes):
-            if cancel and cancel():
+            if interrupted or (cancel and cancel()):
                 interrupted = True
                 break
             current = local_index if evaluate else iteration
             # Training and test seeds are disjoint, never leak map labels.
-            case = (get_scenario(scenario) if scenario and scenario!='random' else
-                    experiment_case(seed,current,held_out=evaluate))
+            pose,family = (0.,0.,0.),'evaluation' if evaluate else 'explicit'
+            if scenario and scenario!='random':
+                case = get_scenario(scenario)
+            elif evaluate:
+                case = experiment_case(seed,current,held_out=True)
+            else:
+                case,pose,family = training_case(seed,current)
             env = FlyCarEnv(SIM,DRIVE,seed=seed,scenario=case,render=True)
             live_viewer = None
             try:
+                place_start(env,pose)
                 if viewer:
                     import mujoco.viewer as mj_viewer
                     live_viewer = mj_viewer.launch_passive(env.m,env.d)
@@ -158,7 +169,8 @@ def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
                     save_checkpoint(path,model,optimizer,data,iteration)
                 report.update(episode=local_index+1,total=episodes,iteration=iteration,
                               evaluation=evaluate,teacher_beta=beta,loss=loss,
-                              reward=-(loss or 0),scenario=case.name,baseline=baseline)
+                              reward=-(loss or 0),scenario=case.name,baseline=baseline,
+                              family=family,start_pose=pose)
                 reports.append(report)
                 print(json.dumps(report,allow_nan=False),flush=True)
                 if progress:
@@ -182,6 +194,10 @@ def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
                     live_viewer.close()
                 if env.renderer is not None:
                     env.renderer.close()
+            if not evaluate and validation_interval and iteration%validation_interval==0:
+                interrupted = assess()
+                if interrupted:
+                    break
     except KeyboardInterrupt:
         interrupted = True
     finally:
@@ -190,7 +206,7 @@ def run_experiment(*,output,episodes=12,steps=2400,seed=0,evaluate=False,
     result = {'episodes':len(reports),'successes':sum(r['success'] for r in reports),
               'mean_reward':sum(r['reward'] for r in reports)/max(1,len(reports)),
               'cancelled':interrupted,'evaluation':evaluate,'baseline':baseline,
-              'reports':reports,'iteration':iteration}
+              'reports':reports,'iteration':iteration,'validations':validations}
     if evaluate:
         destination = path.with_name(path.stem+f'.evaluation-{seed}.json')
         destination.write_text(json.dumps(result,indent=2,allow_nan=False))

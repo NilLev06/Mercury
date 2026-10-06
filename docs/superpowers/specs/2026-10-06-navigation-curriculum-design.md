@@ -30,8 +30,15 @@ promoting an incomplete suite. Preserve last weights, optimizer and 128 replay
 routes. Store the selected checkpoint in a separate `.best.pt`, rank success
 count first, fewer contacts second, lower mean final distance third. Save score,
 suite version, graph signature and baseline architecture with the selection.
-Do not reuse a score from an incompatible graph/model/suite. Test jobs use best
-when present, otherwise last; training always resumes last. Old Q files untouched.
+Do not reuse a score from an incompatible graph/model/suite. Lab test jobs use best
+when present, otherwise last; explicit CLI/API output paths remain exact for
+diagnostic comparisons. Training always resumes last. Old Q files untouched.
+
+The near-contact diagnostic exposed repeated A* at an unchanged blocked pose.
+Reuse its existing recovery route until translation exceeds 1 cm or rotation
+exceeds 0.05 radians; displacement/path exhaustion still trigger replanning.
+Recovery demonstrations start at (.65,-.30) relative to the cylinder map,
+not the tighter (.72,-.22) pose where tracking failed in the teacher check.
 
 ## Verification
 

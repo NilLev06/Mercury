@@ -39,6 +39,24 @@ class ObservationTests(unittest.TestCase):
 
 
 class TeacherTests(unittest.TestCase):
+    def test_contact_without_pose_change_does_not_repeat_expensive_replanning(self):
+        from unittest.mock import patch
+        from fly_brain_rc.imitation.teacher import BicycleTeacher
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        from fly_brain_rc.sim.scenarios import Scenario,BLUE
+        from fly_brain_rc.sim.kinematics import BicycleState
+        env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('contact',(((1.15,.18),BLUE),),(2.35,0)),render=False)
+        teacher = BicycleTeacher(env)
+        env.state = BicycleState(.65,-.3,0)
+        env._sync_kinematic()
+        env._contact_active = True
+        with patch.object(teacher,'_plan',wraps=teacher._plan) as planner:
+            commands = [teacher.action() for _ in range(5)]
+            self.assertEqual(planner.call_count,1)
+        self.assertTrue(all(command==commands[0] for command in commands))
+        self.assertGreater(abs(commands[0][0]),.1)
+
     def test_teacher_can_escape_when_only_tracking_margin_touches_cylinder(self):
         from fly_brain_rc.imitation.teacher import BicycleTeacher
         from fly_brain_rc.config import DRIVE,SIM
@@ -148,7 +166,7 @@ class TrainingTests(unittest.TestCase):
             old_data = [(torch.ones(2,19),torch.zeros(2,2))]
             save_checkpoint(path,model,torch.optim.Adam(model.parameters()),old_data,43)
             with patch('fly_brain_rc.imitation.runner.prepare_graph',return_value=graph),patch('fly_brain_rc.imitation.runner.FlyCarEnv',side_effect=env_factory):
-                result = run_experiment(output=path,episodes=6,steps=1,updates=0,seed=7)
+                result = run_experiment(output=path,episodes=6,steps=1,updates=0,seed=7,validation_interval=0)
             self.assertEqual([r['teacher_beta'] for r in result['reports']],[1,.5,.5,0,0,1])
             restored,_,data,iteration = load_checkpoint(path,graph)
             self.assertEqual(iteration,49)

@@ -11,6 +11,7 @@ class BicycleTeacher:
         self.env = env
         self.path = self._plan()
         self.cursor = 0
+        self.planned_pose = env.car_pose()
 
     def _safe(self, state, margin=.045):
         # The environment's exact chassis + outer wheel footprint, with a
@@ -82,9 +83,14 @@ class BicycleTeacher:
         window = self.path[self.cursor:min(len(self.path),self.cursor+24)]
         deviation = min((math.hypot(p[0]-x,p[1]-y) for p in window),default=math.inf)
         exhausted = self.cursor >= len(self.path)-2
-        if env._contact_active or deviation > .25 or exhausted:
+        px,py,pyaw = self.planned_pose
+        moved = math.hypot(x-px,y-py)>.01 or abs((yaw-pyaw+math.pi)%(2*math.pi)-math.pi)>.05
+        # A blocked student can issue hundreds of actions at the same pose.
+        # Its recovery route remains valid; do not rerun A* for every label.
+        if (env._contact_active and moved) or deviation > .25 or exhausted:
             self.path = self._plan()
             self.cursor = 0
+            self.planned_pose = env.car_pose()
         # Follow the nearest local path point, retaining direction changes.
         end = min(len(self.path),self.cursor+24)
         self.cursor = min(range(self.cursor,end),
