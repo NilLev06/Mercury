@@ -1,0 +1,112 @@
+[
+  {
+    "policy": "control",
+    "case": "straight",
+    "success": false,
+    "minimum_center": 0.25924924008098194,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 11.42,
+    "stalled_seconds": 3.9,
+    "seen_fraction": 0.45458333333333334
+  },
+  {
+    "policy": "control",
+    "case": "single_cylinder",
+    "success": false,
+    "minimum_center": 1.6230086736221878,
+    "contacts": 1,
+    "steps": 2400,
+    "reverse_seconds": 17.82,
+    "stalled_seconds": 8.86,
+    "seen_fraction": 0.9241666666666667
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000042-0",
+    "success": false,
+    "minimum_center": 0.25399945856315964,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 13.1,
+    "stalled_seconds": 3.52,
+    "seen_fraction": 0.39916666666666667
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000042-3",
+    "success": false,
+    "minimum_center": 0.5097046991185326,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 11.84,
+    "stalled_seconds": 4.42,
+    "seen_fraction": 0.26
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-0",
+    "success": false,
+    "minimum_center": 0.5316659037677124,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 10.9,
+    "stalled_seconds": 2.82,
+    "seen_fraction": 0.09791666666666667
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-1",
+    "success": false,
+    "minimum_center": 1.5535637687754988,
+    "contacts": 9,
+    "steps": 2400,
+    "reverse_seconds": 16.9,
+    "stalled_seconds": 5.5200000000000005,
+    "seen_fraction": 0.5341666666666667
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-2",
+    "success": false,
+    "minimum_center": 0.49387679981950866,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 14.6,
+    "stalled_seconds": 3.38,
+    "seen_fraction": 0.16708333333333333
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-3",
+    "success": false,
+    "minimum_center": 1.5514498736974913,
+    "contacts": 1,
+    "steps": 2400,
+    "reverse_seconds": 17.5,
+    "stalled_seconds": 8.700000000000001,
+    "seen_fraction": 0.9075
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-4",
+    "success": false,
+    "minimum_center": 1.7018133006675322,
+    "contacts": 2,
+    "steps": 2400,
+    "reverse_seconds": 17.64,
+    "stalled_seconds": 8.74,
+    "seen_fraction": 0.9158333333333334
+  },
+  {
+    "policy": "control",
+    "case": "bypass-test-1000073-5",
+    "success": false,
+    "minimum_center": 0.5215228786651577,
+    "contacts": 4,
+    "steps": 2400,
+    "reverse_seconds": 13.32,
+    "stalled_seconds": 8.1,
+    "seen_fraction": 0.5954166666666667
+  }
+]

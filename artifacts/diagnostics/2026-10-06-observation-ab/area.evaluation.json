@@ -1,0 +1,112 @@
+[
+  {
+    "policy": "area",
+    "case": "straight",
+    "success": false,
+    "minimum_center": 0.4729519193391439,
+    "contacts": 4,
+    "steps": 2400,
+    "reverse_seconds": 14.26,
+    "stalled_seconds": 5.16,
+    "seen_fraction": 0.24125
+  },
+  {
+    "policy": "area",
+    "case": "single_cylinder",
+    "success": false,
+    "minimum_center": 1.6226583663088876,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 16.22,
+    "stalled_seconds": 9.96,
+    "seen_fraction": 0.46625
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000042-0",
+    "success": false,
+    "minimum_center": 0.427412270349605,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 16.42,
+    "stalled_seconds": 3.16,
+    "seen_fraction": 0.19375
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000042-3",
+    "success": false,
+    "minimum_center": 0.5807677028781307,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 13.5,
+    "stalled_seconds": 6.22,
+    "seen_fraction": 0.2625
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-0",
+    "success": false,
+    "minimum_center": 0.5975316817157097,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 12.620000000000001,
+    "stalled_seconds": 5.0,
+    "seen_fraction": 0.10916666666666666
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-1",
+    "success": false,
+    "minimum_center": 1.576322382934818,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 16.0,
+    "stalled_seconds": 10.040000000000001,
+    "seen_fraction": 0.6608333333333334
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-2",
+    "success": false,
+    "minimum_center": 0.5751669768260386,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 8.18,
+    "stalled_seconds": 4.3,
+    "seen_fraction": 0.2791666666666667
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-3",
+    "success": false,
+    "minimum_center": 1.5508915950583642,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 15.94,
+    "stalled_seconds": 9.98,
+    "seen_fraction": 0.58625
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-4",
+    "success": false,
+    "minimum_center": 1.7155328330989443,
+    "contacts": 19,
+    "steps": 2400,
+    "reverse_seconds": 16.72,
+    "stalled_seconds": 8.700000000000001,
+    "seen_fraction": 0.5470833333333334
+  },
+  {
+    "policy": "area",
+    "case": "bypass-test-1000073-5",
+    "success": false,
+    "minimum_center": 0.42390024903690654,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 15.200000000000001,
+    "stalled_seconds": 4.16,
+    "seen_fraction": 0.08916666666666667
+  }
+]

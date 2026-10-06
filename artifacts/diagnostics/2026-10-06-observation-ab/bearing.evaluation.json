@@ -1,0 +1,112 @@
+[
+  {
+    "policy": "bearing",
+    "case": "straight",
+    "success": false,
+    "minimum_center": 0.11267481808055,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 14.200000000000001,
+    "stalled_seconds": 7.7,
+    "seen_fraction": 0.22625
+  },
+  {
+    "policy": "bearing",
+    "case": "single_cylinder",
+    "success": false,
+    "minimum_center": 0.4855475963019771,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 15.8,
+    "stalled_seconds": 5.18,
+    "seen_fraction": 0.03625
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000042-0",
+    "success": false,
+    "minimum_center": 0.3721859478841675,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 15.4,
+    "stalled_seconds": 8.6,
+    "seen_fraction": 0.99375
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000042-3",
+    "success": false,
+    "minimum_center": 0.5408302938133047,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 12.06,
+    "stalled_seconds": 6.42,
+    "seen_fraction": 0.2375
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-0",
+    "success": false,
+    "minimum_center": 0.5170426813807627,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 14.94,
+    "stalled_seconds": 2.56,
+    "seen_fraction": 0.09416666666666666
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-1",
+    "success": false,
+    "minimum_center": 1.5754063065785577,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 16.0,
+    "stalled_seconds": 10.040000000000001,
+    "seen_fraction": 0.6879166666666666
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-2",
+    "success": false,
+    "minimum_center": 0.5359125034449723,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 13.1,
+    "stalled_seconds": 7.72,
+    "seen_fraction": 0.18666666666666668
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-3",
+    "success": false,
+    "minimum_center": 1.5520572089530598,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 15.84,
+    "stalled_seconds": 9.16,
+    "seen_fraction": 0.5845833333333333
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-4",
+    "success": false,
+    "minimum_center": 1.7042748667824998,
+    "contacts": 2,
+    "steps": 2400,
+    "reverse_seconds": 17.2,
+    "stalled_seconds": 8.5,
+    "seen_fraction": 0.85875
+  },
+  {
+    "policy": "bearing",
+    "case": "bypass-test-1000073-5",
+    "success": false,
+    "minimum_center": 0.37313621629465804,
+    "contacts": 0,
+    "steps": 2400,
+    "reverse_seconds": 13.98,
+    "stalled_seconds": 8.74,
+    "seen_fraction": 0.5079166666666667
+  }
+]
