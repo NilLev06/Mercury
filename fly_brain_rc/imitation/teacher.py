@@ -2,7 +2,8 @@
 import heapq
 import itertools
 import math
-from ..sim.kinematics import BicycleState
+from dataclasses import replace
+from ..sim.kinematics import BicycleState,step_bicycle
 from .arrival import body_goal_distance
 
 
@@ -12,6 +13,15 @@ class BicycleTeacher:
         self.path = self._plan()
         self.cursor = 0
         self.planned_pose = env.car_pose()
+        self.escape = None
+
+    def _command_safe(self, throttle, steering):
+        state = self.env.state
+        for _ in range(5):
+            state = step_bicycle(state,throttle,steering,self.env.drive,self.env.drive.timestep)
+            if self.env._pose_collides(state):
+                return False
+        return True
 
     def _safe(self, state, margin=.045):
         # The environment's exact chassis + outer wheel footprint, with a
@@ -30,6 +40,19 @@ class BicycleTeacher:
         # tracking margin. Requiring that margin on the first escape sample
         # traps the planner. Recovery still checks the full wheel footprint.
         margin = .045 if self._safe(BicycleState(*start)) else 0.0
+        initial_state = env.state
+        def initial_safe(state,direction,steering):
+            for _ in range(5):
+                state = step_bicycle(state,.7*direction,steering,env.drive,env.drive.timestep)
+                if not self._safe(state,margin):
+                    return False
+            return True
+        if not any(initial_safe(initial_state,d,s)
+                   for d in (1,-1) for s in (-1.,-.5,0.,.5,1.)):
+            # Momentum may make every immediate command collide. Plan the
+            # escape after braking, without changing the environment; action()
+            # still checks actual momentum and issues its braking fallback.
+            initial_state = replace(initial_state,speed=0.,yaw_rate=0.)
         goal = env.goal
         def distance(p):
             return math.hypot(goal[0]-p[0]-env.drive.wheelbase/2*math.cos(p[2]),
@@ -49,6 +72,12 @@ class BicycleTeacher:
                 return list(path)
             for direction in (1,-1):
                 for steering in (-1.0,-.5,0.0,.5,1.0):
+                    # The first coarse waypoint can lie beyond a grazing
+                    # collision. Check the actual acceleration/control interval
+                    # before admitting an initial escape primitive.
+                    if not path:
+                        if not initial_safe(initial_state,direction,steering):
+                            continue
                     x,y,yaw = pose
                     samples = []
                     curvature = math.tan(steering*env.drive.max_steer_rad)/env.drive.wheelbase
@@ -80,6 +109,13 @@ class BicycleTeacher:
         if distance <= .43:
             return 0.0,0.0
         x,y,yaw = env.car_pose()
+        if self.escape is not None:
+            origin,command = self.escape
+            if math.hypot(x-origin[0],y-origin[1]) < .15 and self._command_safe(*command):
+                return command
+            self.escape = None
+            self.path,self.cursor = self._plan(),0
+            self.planned_pose = env.car_pose()
         window = self.path[self.cursor:min(len(self.path),self.cursor+24)]
         deviation = min((math.hypot(p[0]-x,p[1]-y) for p in window),default=math.inf)
         exhausted = self.cursor >= len(self.path)-2
@@ -93,6 +129,19 @@ class BicycleTeacher:
             self.planned_pose = env.car_pose()
         # Follow the nearest local path point, retaining direction changes.
         end = min(len(self.path),self.cursor+24)
+        # Never jump over a reversing cusp to a nearby returning waypoint.
+        # Complete the current direction segment before selecting the next.
+        direction = self.path[self.cursor][3]
+        cusp = next((i for i in range(self.cursor+1,end)
+                     if self.path[i][3]!=direction),end)
+        end = cusp
+        if cusp < len(self.path) and math.hypot(self.path[cusp-1][0]-x,
+                                               self.path[cusp-1][1]-y)<.035:
+            self.cursor = cusp
+            end = min(len(self.path),self.cursor+24)
+            direction = self.path[self.cursor][3]
+            end = next((i for i in range(self.cursor+1,end)
+                        if self.path[i][3]!=direction),end)
         self.cursor = min(range(self.cursor,end),
                           key=lambda i: math.hypot(self.path[i][0]-x,self.path[i][1]-y))
         direction = self.path[self.cursor][3]
@@ -105,4 +154,17 @@ class BicycleTeacher:
         steering = math.atan(2*env.drive.wheelbase*math.sin(angle)/length)/env.drive.max_steer_rad
         # Brake early enough to settle inside the same scoring radius.
         throttle = direction*min(.7,max(.12,(distance-.43)*2))
-        return throttle,max(-1,min(1,steering))
+        command = throttle,max(-1,min(1,steering))
+        if not self._command_safe(*command):
+            # A geometric A* route is not a guarantee that pure pursuit can
+            # execute it at a grazing contact. Use a checked short backoff,
+            # then plan from the new pose instead of teaching repeated impacts.
+            for steer in (0.,-.5,.5,-1.,1.):
+                escape = -.7*direction,steer
+                if self._command_safe(*escape):
+                    self.escape = ((x,y),escape)
+                    return escape
+            # Current forward momentum may require a blocked braking tick
+            # before a reverse command becomes feasible.
+            return -.7*direction,0.
+        return command

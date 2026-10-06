@@ -11,9 +11,25 @@ def graph_signature(graph):
     return hashlib.sha256(json.dumps(graph,sort_keys=True).encode()).hexdigest()
 
 
-class RecurrentPolicy(nn.Module):
-    def __init__(self,graph,baseline=False):
+class ResidualMotorHead(nn.Module):
+    """Learned motor adapter; no planner, map or hidden target inputs."""
+    def __init__(self,base):
         super().__init__()
+        self.base = base
+        self.residual = nn.Sequential(nn.Linear(base.in_features,32),nn.Tanh(),nn.Linear(32,2))
+        nn.init.zeros_(self.residual[-1].weight)
+        nn.init.zeros_(self.residual[-1].bias)
+
+    def forward(self,state):
+        return self.base(state)+self.residual(state)
+
+
+class RecurrentPolicy(nn.Module):
+    def __init__(self,graph,baseline=False,*,motor_head='linear'):
+        super().__init__()
+        if motor_head not in ('linear','residual32'):
+            raise ValueError('unknown motor head architecture')
+        self.motor_head = motor_head
         self.graph,self.baseline = graph,baseline
         self.training_metadata = {'seeds':[],'cases':[]}
         n = len(graph['ids'])
@@ -30,6 +46,12 @@ class RecurrentPolicy(nn.Module):
         self.bias = nn.Parameter(torch.zeros(n))
         self.leak = nn.Parameter(torch.zeros(n))
         self.readout = nn.Linear(n,2)
+        if motor_head=='residual32':
+            self.readout = ResidualMotorHead(self.readout)
+            # Preserve the trained sensory/recurrent dynamics and old motor
+            # mapping. Only the explicit residual adapter learns in this mode.
+            for name,parameter in self.named_parameters():
+                parameter.requires_grad_('readout.residual.' in name)
 
     def effective_weights(self):
         return self.recurrent*self.mask
@@ -51,6 +73,7 @@ def save_checkpoint(path,model,optimizer,trajectories,iteration):
     path = Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
     payload = {'version':1,'schema':SCHEMA,'graph':model.graph,
+               'motor_head':model.motor_head,
                'signature':graph_signature(model.graph),'baseline':model.baseline,
                'model':model.state_dict(),'optimizer':optimizer.state_dict(),
                'training_metadata':model.training_metadata,
@@ -67,7 +90,7 @@ def load_checkpoint(path,graph,*,baseline=False):
             or payload.get('signature')!=graph_signature(graph)
             or payload.get('baseline')!=baseline):
         raise ValueError('checkpoint graph, model or observation schema mismatch')
-    model = RecurrentPolicy(graph,baseline)
+    model = RecurrentPolicy(graph,baseline,motor_head=payload.get('motor_head','linear'))
     model.load_state_dict(payload['model'])
     model.training_metadata = payload.get('training_metadata',{'seeds':[],'cases':[]})
     optimizer = torch.optim.Adam(model.parameters(),lr=3e-4)

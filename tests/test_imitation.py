@@ -39,6 +39,47 @@ class ObservationTests(unittest.TestCase):
 
 
 class TeacherTests(unittest.TestCase):
+    def test_momentum_at_cylinder_allows_braking_before_recovery(self):
+        from fly_brain_rc.imitation.teacher import BicycleTeacher
+        from fly_brain_rc.imitation.curriculum import training_case,place_start
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        case,_,_=training_case(991,78)
+        env=FlyCarEnv(SIM,DRIVE,scenario=case,render=False)
+        place_start(env,(.6746164319358051,.11194259790679345,.2839884961907569))
+        env.state=replace(env.state,speed=.1)
+        teacher=BicycleTeacher(env)
+        self.assertEqual(env.state.speed,.1)
+        self.assertTrue(teacher.path)
+        for _ in range(5):
+            env.step(*teacher.action(),observe=False)
+        self.assertTrue(math.isfinite(env.speed))
+
+    def test_teacher_recovers_from_student_cylinder_contact_poses(self):
+        from fly_brain_rc.imitation.teacher import BicycleTeacher
+        from fly_brain_rc.imitation.curriculum import training_case,place_start
+        from fly_brain_rc.imitation.arrival import GoalStop,body_goal_distance
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        fixtures = (
+            (991,(.6746164319358051,.11194259790679345,.2839884961907569)),
+            (992,(.5513925594993055,-.12357173238258949,-.5182343655540489)),
+            (992,(.5491079670429669,-.1222718557930181,-.5165449971522635)),
+        )
+        for seed,pose in fixtures:
+            with self.subTest(seed=seed):
+                case,_,_=training_case(seed,78)
+                env=FlyCarEnv(SIM,DRIVE,scenario=case,render=False)
+                place_start(env,pose)
+                teacher,stop=BicycleTeacher(env),GoalStop()
+                for index in range(1600):
+                    if index%5==0:
+                        action=teacher.action()
+                    env.step(*action,observe=False)
+                    if stop.update(body_goal_distance(env),env.speed,DRIVE.timestep):
+                        break
+                self.assertGreaterEqual(stop.elapsed,.5-1e-9,env.car_pose())
+
     def test_contact_without_pose_change_does_not_repeat_expensive_replanning(self):
         from unittest.mock import patch
         from fly_brain_rc.imitation.teacher import BicycleTeacher
@@ -121,6 +162,56 @@ class TeacherTests(unittest.TestCase):
 
 
 class NetworkTests(unittest.TestCase):
+    def test_unknown_motor_head_is_rejected(self):
+        from fly_brain_rc.imitation.model import RecurrentPolicy
+        with self.assertRaisesRegex(ValueError,'motor head'):
+            RecurrentPolicy(self.graph(),motor_head='unknown')
+
+    def test_residual_motor_training_preserves_existing_brain(self):
+        import torch
+        from fly_brain_rc.imitation.model import RecurrentPolicy
+        model=RecurrentPolicy(self.graph(),motor_head='residual32')
+        before={n:p.detach().clone() for n,p in model.named_parameters()}
+        optimizer=torch.optim.Adam(model.parameters(),lr=.01)
+        x=torch.ones(1,5,19)
+        output,_=model(x)
+        optimizer.zero_grad();(output-.7).square().mean().backward();optimizer.step()
+        after=dict(model.named_parameters())
+        for name,value in before.items():
+            if 'readout.residual' not in name:
+                self.assertTrue(torch.equal(value,after[name]),name)
+                self.assertFalse(after[name].requires_grad,name)
+        self.assertTrue(any(not torch.equal(v,after[n]) for n,v in before.items()
+                            if 'readout.residual' in n))
+
+    def test_residual_checkpoint_roundtrips_outputs_and_optimizer(self):
+        import torch
+        from fly_brain_rc.imitation.model import RecurrentPolicy,save_checkpoint,load_checkpoint
+        graph=self.graph();model=RecurrentPolicy(graph,motor_head='residual32')
+        optimizer=torch.optim.Adam(model.parameters(),lr=.001)
+        x=torch.randn(1,9,19);out,_=model(x)
+        out.square().mean().backward();optimizer.step()
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'residual.pt'
+            save_checkpoint(path,model,optimizer,[],144)
+            restored,opt,_,iteration=load_checkpoint(path,graph)
+        self.assertEqual(iteration,144)
+        self.assertEqual(restored.motor_head,'residual32')
+        torch.testing.assert_close(restored(x)[0],model(x)[0],rtol=0,atol=0)
+        self.assertEqual(len(opt.state),len(optimizer.state))
+
+    def test_legacy_checkpoint_without_motor_head_keeps_linear_outputs(self):
+        import torch
+        from fly_brain_rc.imitation.model import RecurrentPolicy,save_checkpoint,load_checkpoint
+        graph=self.graph();model=RecurrentPolicy(graph);x=torch.randn(1,4,19)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'legacy.pt'
+            save_checkpoint(path,model,torch.optim.Adam(model.parameters()),[],12)
+            payload=torch.load(path,weights_only=True);payload.pop('motor_head',None);torch.save(payload,path)
+            restored,_,_,_=load_checkpoint(path,graph)
+        self.assertEqual(restored.motor_head,'linear')
+        torch.testing.assert_close(restored(x)[0],model(x)[0],rtol=0,atol=0)
+
     def graph(self):
         from fly_brain_rc.imitation.connectome import extract_graph
         with tempfile.TemporaryDirectory() as directory:
