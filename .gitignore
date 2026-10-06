@@ -5,6 +5,7 @@ MUJOCO_LOG.TXT
 .DS_Store
 .worktrees/
 .local/
+artifacts/imitation/
 figures/*diagnostic*.png
 figures/*bicycle_*.png
 artifacts/evolution/checkpoint.json

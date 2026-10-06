@@ -105,6 +105,42 @@ def _run_rl_trainer(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_imitation(args):
+    if sys.platform == 'darwin' and 'MJPYTHON_BIN' not in os.environ:
+        command = [_mjpython_path(),str(Path(__file__).resolve()),args.command,
+                   '--episodes',str(args.episodes),'--steps',str(args.steps),
+                   '--seed',str(args.seed),'--updates',str(args.updates),'--out',args.out]
+        for flag in ('baseline','dashboard','viewer'):
+            if getattr(args,flag):
+                command.append('--'+flag)
+        if args.scenario:
+            command += ['--scenario',args.scenario]
+        os.execv(command[0],command)
+    from fly_brain_rc.imitation.runner import run_experiment
+    import json
+    dashboard = mission = emit = progress = None
+    if args.dashboard:
+        from fly_brain_rc.dashboard.server import DashboardServer,MissionController
+        from fly_brain_rc.telemetry import TelemetryBus
+        bus,mission = TelemetryBus(),MissionController(running=True)
+        dashboard = DashboardServer(bus,mission).start()
+        emit,progress = bus.publish,mission.update_training
+    cancel_path = os.environ.get('DIGITAL_FLY_CANCEL_FILE')
+    cancel = (lambda:Path(cancel_path).exists()) if cancel_path else None
+    try:
+        result = run_experiment(output=args.out,episodes=args.episodes,steps=args.steps,
+            seed=args.seed,evaluate=args.command=='test-imitation',baseline=args.baseline,
+            updates=args.updates,emit=emit,progress=progress,cancel=cancel,
+            scenario=args.scenario,viewer=args.viewer,mission=mission)
+        if mission:
+            mission.finish(result)
+        print(json.dumps(result,allow_nan=False),flush=True)
+    finally:
+        if dashboard:
+            dashboard.close()
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Digital Fly Car launcher")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -152,6 +188,17 @@ def main() -> int:
         command.add_argument('--epsilon',type=float,default=.3)
         command.add_argument('--out',default='artifacts/rl/bypass-policy.json')
         command.add_argument('--dashboard',action='store_true')
+    for name in ('train-imitation','test-imitation'):
+        command = subparsers.add_parser(name,help='anatomical imitation/DAgger experiment')
+        command.add_argument('--episodes',type=int,default=12)
+        command.add_argument('--steps',type=int,default=2400)
+        command.add_argument('--seed',type=int,default=0)
+        command.add_argument('--updates',type=int,default=100)
+        command.add_argument('--out',default='artifacts/imitation/connectome.pt')
+        command.add_argument('--baseline',action='store_true')
+        command.add_argument('--dashboard',action='store_true')
+        command.add_argument('--viewer',action='store_true')
+        command.add_argument('--scenario',choices=('corridor','single_cylinder','turn_corridor','slalom','blocked_goal','random'))
     lab = subparsers.add_parser('lab',help='persistent browser mode selector')
     lab.add_argument('--port',type=int,default=8765)
     args = parser.parse_args()
@@ -161,6 +208,15 @@ def main() -> int:
     os.chdir(PROJECT_ROOT)
     os.environ.setdefault("PYTHONPATH", str(PROJECT_ROOT))
     os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/mpl-flybrain")
+
+    if args.command in ('train-imitation','test-imitation'):
+        if args.episodes<1 or args.steps<1 or args.updates<1:
+            parser.error('episode, step and update counts must be positive')
+        if args.viewer and args.command!='test-imitation':
+            parser.error('--viewer is only available for test-imitation')
+        if args.baseline and args.out=='artifacts/imitation/connectome.pt':
+            args.out = 'artifacts/imitation/rnn.pt'
+        return _run_imitation(args)
 
     if args.command == "sim":
         if args.scenario == "random":

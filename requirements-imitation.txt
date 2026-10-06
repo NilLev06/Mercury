@@ -1,0 +1,4 @@
+# Optional experimental imitation mode; old controllers do not import torch.
+torch>=2.4,<3
+networkx>=3,<4
+py7zr>=0.22,<2

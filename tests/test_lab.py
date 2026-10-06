@@ -6,6 +6,21 @@ import sys
 
 
 class LabTests(unittest.TestCase):
+    def test_imitation_jobs_are_separate_and_baseline_is_strict_boolean(self):
+        from fly_brain_rc.dashboard.lab import build_job
+        root = Path('/tmp/project')
+        args = build_job(root,{'mode':'imitation_train','baseline':False,'episodes':6})
+        self.assertIn('train-imitation',args)
+        self.assertIn(str(root/'artifacts/imitation/connectome.pt'),args)
+        baseline = build_job(root,{'mode':'imitation_train','baseline':True})
+        self.assertIn('--baseline',baseline)
+        self.assertIn(str(root/'artifacts/imitation/rnn.pt'),baseline)
+        self.assertNotIn('bypass-policy.json',' '.join(args))
+        with self.assertRaises(ValueError):
+            build_job(root,{'mode':'imitation_train','baseline':'true'})
+        with self.assertRaises(ValueError):
+            build_job(root,{'mode':'imitation_test'})
+
     def test_restart_waits_for_cleanup_even_when_leader_has_exited(self):
         from fly_brain_rc.dashboard.lab import JobManager
         from threading import Event

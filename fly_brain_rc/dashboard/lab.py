@@ -14,16 +14,20 @@ from urllib.request import urlopen
 import uuid
 
 
-MODES = ('bypass_train','bypass_test','general_train','bypass_sim','general_sim','reflex')
+MODES = ('imitation_train','imitation_test','imitation_sim',
+         'bypass_train','bypass_test','general_train','bypass_sim','general_sim','reflex')
 SCENARIOS = ('corridor','turn_corridor','slalom','blocked_goal','random','single_cylinder')
 
 
 def build_job(root, request):
-    if not isinstance(request,dict) or set(request)-{'mode','episodes','steps','seed','scenario'}:
+    if not isinstance(request,dict) or set(request)-{'mode','episodes','steps','seed','scenario','baseline'}:
         raise ValueError('unknown job fields')
     mode = request.get('mode')
     if mode not in MODES:
         raise ValueError('unknown mode')
+    baseline = request.get('baseline',False)
+    if type(baseline) is not bool:
+        raise ValueError('baseline must be boolean')
     values = {}
     for name,default,low,high in (('episodes',120,1,10000),('steps',2400,1,20000),('seed',0,0,2**31-1)):
         value = request.get(name,default)
@@ -34,7 +38,19 @@ def build_job(root, request):
     if scenario not in SCENARIOS:
         raise ValueError('unknown scenario')
     command = [sys.executable,str(root/'run.py')]
-    if mode in ('bypass_train','bypass_test','general_train'):
+    if mode.startswith('imitation_'):
+        path = root/'artifacts/imitation'/('rnn.pt' if baseline else 'connectome.pt')
+        if mode != 'imitation_train' and not path.exists():
+            raise ValueError('Сначала обучи выбранную imitation-модель.')
+        command += ['train-imitation' if mode=='imitation_train' else 'test-imitation',
+                    '--episodes',str(1 if mode=='imitation_sim' else values['episodes']),
+                    '--steps',str(values['steps']),'--seed',str(values['seed']),
+                    '--out',str(path),'--dashboard']
+        if baseline:
+            command.append('--baseline')
+        if mode=='imitation_sim':
+            command += ['--viewer','--scenario',scenario]
+    elif mode in ('bypass_train','bypass_test','general_train'):
         command += [{'bypass_train':'train-bypass','bypass_test':'test-bypass','general_train':'train-rl'}[mode],
                     '--episodes',str(values['episodes']),'--steps',str(values['steps']),
                     '--seed',str(values['seed']),'--out',str(root/'artifacts/rl'/
@@ -131,7 +147,8 @@ class JobManager:
             self.stop_done.clear()
             process = self.process
             self.cancel_file.touch()
-            training = self.mode in ('bypass_train','bypass_test','general_train')
+            training = self.mode in ('bypass_train','bypass_test','general_train',
+                                     'imitation_train','imitation_test','imitation_sim')
         # Trainers see the flag on the next tick and checkpoint. Viewer loops
         # have no trainer callback, so receive SIGINT immediately.
         Thread(target=self._stop_job,args=(process,training),daemon=True).start()
