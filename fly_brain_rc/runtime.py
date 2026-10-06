@@ -75,7 +75,7 @@ class FlyRuntime:
                     self._acquisition_time = sensor.timestamp
                 # Explicit simulator evaluation only; no coordinate reaches the
                 # brain. Bypass experiment scores reach, not learned stopping.
-                arrived = (self.env.goal_distance() <= self.env.sim_cfg.goal_radius if self.bypass_evaluation
+                arrived = (self.env.goal_center_reached() if self.bypass_evaluation
                            else self.arrival.update(target, command, sensor.encoder_delta / self.dt, sensor.tof, self.dt))
                 self.mission.arrival_elapsed = self.arrival.elapsed
                 self.mission.arrival_reason = self.arrival.last_reason
@@ -87,6 +87,7 @@ class FlyRuntime:
                     self.mission.result = {'stable_arrival': not self.bypass_evaluation, 'timestamp': sensor.timestamp}
                     if self.bypass_evaluation:
                         self.mission.result['goal_reached'] = True
+                        self.env.stop_motion()
             if not active or self.mission.status == 'finished':
                 command = ActuatorCommand(0, 0, sensor.timestamp, self._sequence)
             else:

@@ -120,7 +120,7 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
                 next_sensor = env.sensor_frame()
                 target = detector.detect(next_sensor,'red_ball')
                 next_state = controller.observe(next_sensor,target,obstacles.detect(next_sensor,'obstacle'))
-                reached = env.goal_distance() <= SIM.goal_radius
+                reached = env.goal_center_reached()
                 reward = reward_model.step(env.goal_distance(),contact=next_sensor.contact,
                                            steering=steering,reached=reached,dt=DRIVE.timestep)
                 total += reward
@@ -144,6 +144,7 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
                 if progress:
                     progress(index+1,episodes,total,0)
                 if reached:
+                    env.stop_motion()
                     break
             if cancelled and remaining > 0 and applied_steps and not evaluate:
                 agent.update(window_state,action,window_reward,state,terminal=False)
@@ -151,7 +152,8 @@ def train_bypass(*, episodes, steps, output, seed=0, epsilon=.3,
             env.renderer.close()
         totals.append(total)
         successes += int(reached)
-        report = dict(task='bypass-v1',sensor_schema=2,run=run,episode=index+1,seed=case.seed,
+        report = dict(task='bypass-v1',sensor_schema=2,arrival_criterion='body-center-5cm',
+                      run=run,episode=index+1,seed=case.seed,
                       evaluation=evaluate,success=reached,cancelled=cancelled,
                       steps=applied_steps,reward=total,contacts=env.collisions,
                       contact_seconds=contacts*DRIVE.timestep,minimum_final_distance=env.goal_distance())

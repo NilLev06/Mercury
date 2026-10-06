@@ -180,6 +180,25 @@ class FlyCarEnv:
         gx, gy = self.goal
         return math.hypot(gx - x, gy - y)
 
+    def goal_center_reached(self) -> bool:
+        """Evaluator-only centre entry; pose is at the rear axle, not body centre."""
+        x,y,yaw = self.car_pose()
+        offset = self.drive.wheelbase/2
+        gx,gy = self.goal
+        return math.hypot(gx-x-offset*math.cos(yaw),
+                          gy-y-offset*math.sin(yaw)) <= .05
+
+    def stop_motion(self):
+        """Simulator end-of-episode brake; preserve position without coasting."""
+        x,y,yaw = self.car_pose()
+        self.state = BicycleState(x,y,yaw,0.0,0.0)
+        self.speed = self._w_cmd_prev = 0.0
+        self.d.qvel[:] = 0
+        if self.sim_cfg.kinematic:
+            self._sync_kinematic()
+        else:
+            mujoco.mj_forward(self.m,self.d)
+
     def goal_surface_clearance(self) -> float:
         """Conservative car-envelope to target-sphere gap, evaluator only.
 

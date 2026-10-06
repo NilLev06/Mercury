@@ -79,7 +79,10 @@ class BypassTests(unittest.TestCase):
         a = QLearningAgent()
         a.task = 'bypass-v1'
         with patch('fly_brain_rc.sim.env.mujoco.Renderer',HeadlessRenderer):
-            env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('reach',(),(.45,0)))
+            env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('reach',(),(.09,0)))
+            from fly_brain_rc.sim.kinematics import BicycleState
+            env.state = BicycleState(0,0,0,.2,.1)
+            env._sync_kinematic()
             mission = MissionController(running=True)
             runtime = FlyRuntime(env,QLearningBrain(a),mission=mission,bypass_evaluation=True)
             record = runtime.tick()
@@ -87,4 +90,38 @@ class BypassTests(unittest.TestCase):
             self.assertTrue(mission.state()['result']['goal_reached'])
             self.assertFalse(mission.state()['result']['stable_arrival'])
             self.assertEqual(record.command.traction,0)
+            self.assertEqual(env.state.speed,0)
+            self.assertEqual(env.state.x,0)
             env.renderer.close()
+
+    def test_viewer_keeps_driving_when_only_near_the_ball(self):
+        from unittest.mock import patch
+        from tests.test_environment import HeadlessRenderer
+        from fly_brain_rc.config import SIM, DRIVE
+        from fly_brain_rc.sim.env import FlyCarEnv
+        from fly_brain_rc.sim.scenarios import Scenario
+        from fly_brain_rc.runtime import FlyRuntime
+        from fly_brain_rc.rl import QLearningBrain
+        from fly_brain_rc.dashboard.server import MissionController
+        a = QLearningAgent()
+        a.task = 'bypass-v1'
+        with patch('fly_brain_rc.sim.env.mujoco.Renderer',HeadlessRenderer):
+            env = FlyCarEnv(SIM,DRIVE,scenario=Scenario('near',(),(.45,0)))
+            mission = MissionController(running=True)
+            record = FlyRuntime(env,QLearningBrain(a),mission=mission,bypass_evaluation=True).tick()
+            self.assertEqual(mission.state()['status'],'running')
+            self.assertNotEqual(record.command.traction,0)
+            env.renderer.close()
+
+    def test_training_scores_center_entry_not_old_half_meter_zone(self):
+        from unittest.mock import patch
+        from tests.test_environment import HeadlessRenderer
+        from fly_brain_rc.bypass_learning import train_bypass
+        from fly_brain_rc.sim.suites import SuiteCase
+        from fly_brain_rc.sim.scenarios import Scenario
+        with tempfile.TemporaryDirectory() as directory, patch('fly_brain_rc.sim.env.mujoco.Renderer',HeadlessRenderer):
+            for x,want in ((.45,0),(.09,1)):
+                case = SuiteCase('center',0,Scenario('center',(),(x,0)),(0,0,0))
+                with patch('fly_brain_rc.bypass_learning.bypass_cases',return_value=(case,)):
+                    result = train_bypass(episodes=1,steps=1,epsilon=0,output=Path(directory)/f'{x}.json')
+                self.assertEqual(result.successes,want)
