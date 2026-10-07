@@ -5,6 +5,7 @@ NOT recorded fly activity; this is not a replication of a self-supervised
 velocity-integration paper and does not train the deployed vehicle.
 """
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
@@ -21,7 +22,7 @@ class TypeParameterFit(nn.Module):
     def __init__(self, network):
         super().__init__()
         self.recurrence=network.recurrence
-        self.kinds=tuple(sorted(set(network._types)))
+        self.kinds=tuple(sorted(set(network._parameter_types)))
         index={kind:i for i,kind in enumerate(self.kinds)}
         p=network.parameters
         gains=torch.tensor([[p['gain'][post][pre] for pre in self.kinds]
@@ -30,7 +31,7 @@ class TypeParameterFit(nn.Module):
             raise ValueError('fit requires explicit nonzero sign hypotheses')
         self.register_buffer('counts',torch.tensor(network.synapse_counts,dtype=torch.float32))
         self.register_buffer('sign',gains.sign())
-        self.register_buffer('type_indices',torch.tensor([index[k] for k in network._types]))
+        self.register_buffer('type_indices',torch.tensor([index[k] for k in network._parameter_types]))
         self.register_buffer('tau',torch.tensor(network._tau,dtype=torch.float32))
         self.register_buffer('cue_indices',torch.tensor(network._cue_indices))
         self.register_buffer('cue_phases',torch.tensor(network._cue_phases,dtype=torch.float32))
@@ -79,6 +80,32 @@ class TypeParameterFit(nn.Module):
             cue=self._cue(cue_phase)
         return self._advance(state,dt,self.weights(),cue)
 
+    def equilibrium_residual(self,state):
+        """Dark target-rate minus activity; zero is necessary, not sufficient,
+        for stable memory. Used only for offline feasibility diagnostics.
+        """
+        if (state.ndim!=2 or len(state)==0 or state.shape[1]!=len(self.counts)
+                or not torch.isfinite(state).all() or torch.any((state<0)|(state>1))):
+            raise ValueError('finite bounded batch x neuron activity required')
+        feedback=state@self.weights().T if self.recurrence else 0.
+        drive=feedback+self.bias.clamp(-10,10)[self.type_indices]
+        return torch.sigmoid(drive.clamp(-60,60))-state
+
+    def profile_loss(self,state,phases):
+        """Ideal centered cosine profile, not a physiological recording.
+
+        Unlike first-moment loss, this detects higher-harmonic distortions.
+        Neither this target nor a fitted auxiliary state is injected at runtime.
+        """
+        self.equilibrium_residual(state)  # Same activity-domain validation.
+        if phases.shape!=(len(state),) or not torch.isfinite(phases).all():
+            raise ValueError('finite cue phase per batch element required')
+        angles=torch.atan2(self.moments[:,1],self.moments[:,0])
+        desired=.3*torch.cos(angles[None,:]-phases[:,None])
+        desired=desired-desired.mean(dim=1,keepdim=True)
+        rates=state@self.groups
+        return ((rates-rates.mean(dim=1,keepdim=True)-desired)**2).mean()
+
     def memory_loss(self,phases,*,cue_steps=50,dark_steps=200):
         if (phases.ndim!=1 or len(phases)==0 or not torch.isfinite(phases).all()
                 or cue_steps<1 or dark_steps<1):
@@ -103,7 +130,7 @@ class TypeParameterFit(nn.Module):
     def parameters_dict(self):
         gains=(self.sign*self.log_gain.clamp(math.log(.01),math.log(50)).exp()).detach().cpu().numpy()
         bias=self.bias.clamp(-10,10).detach().cpu().numpy()
-        p=dict(self._base_parameters)
+        p=copy.deepcopy(self._base_parameters)
         p['gain']={post:{pre:float(gains[i,j]) for j,pre in enumerate(self.kinds)}
                    for i,post in enumerate(self.kinds)}
         p['bias']={k:float(bias[i]) for i,k in enumerate(self.kinds)}

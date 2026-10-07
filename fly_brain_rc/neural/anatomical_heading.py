@@ -68,6 +68,13 @@ class AnatomicalHeading:
         self.root_ids=tuple(neurons)
         self._index={root:i for i,root in enumerate(self.root_ids)}
         self._types=tuple(neurons[root]['cell_type'] for root in self.root_ids)
+        classes=parameters.get('cell_classes')
+        if classes is not None:
+            if set(classes)!=set(self.root_ids) or any(
+                    classes[root] not in (f'{kind}:left',f'{kind}:right')
+                    for root,kind in zip(self.root_ids,self._types)):
+                raise ValueError('cell classes must match neuron identities and anatomical types')
+        self._parameter_types=tuple(classes[root] for root in self.root_ids) if classes else self._types
         counts=np.zeros((len(neurons),len(neurons)),dtype=np.int64)
         for row in anatomy['connections']:
             pre,post,count=row['pre'],row['post'],row['syn_count']
@@ -79,7 +86,7 @@ class AnatomicalHeading:
             raise ValueError('empty anatomical connectivity')
         self._counts=counts
         self._parameters=copy.deepcopy(parameters)
-        kinds=set(self._types)
+        kinds=set(self._parameter_types)
         for field in ('gain','bias','tau'):
             if set(parameters[field])!=kinds:
                 raise ValueError('parameters must cover exactly the selected cell types')
@@ -93,12 +100,12 @@ class AnatomicalHeading:
         scale=parameters['synapse_scale'];strength=parameters['cue_strength']
         if not math.isfinite(scale) or scale<=0 or not math.isfinite(strength) or not 0<=strength<=100:
             raise ValueError('invalid scale or cue strength')
-        gains=np.array([[parameters['gain'][post][pre] for pre in self._types]
-                        for post in self._types])
+        gains=np.array([[parameters['gain'][post][pre] for pre in self._parameter_types]
+                        for post in self._parameter_types])
         self._weights=counts/scale*gains
         self._weights.flags.writeable=False
-        self._bias=np.array([parameters['bias'][kind] for kind in self._types])
-        self._tau=np.array([parameters['tau'][kind] for kind in self._types])
+        self._bias=np.array([parameters['bias'][kind] for kind in self._parameter_types])
+        self._tau=np.array([parameters['tau'][kind] for kind in self._parameter_types])
         self._cue_strength=strength
         phase_by_id={}
         for row in phases['neurons']:

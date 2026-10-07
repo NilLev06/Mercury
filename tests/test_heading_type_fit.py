@@ -56,3 +56,31 @@ class HeadingTypeFitTests(unittest.TestCase):
             state=trial.step(state,.01,cue_phase=torch.tensor([.3]))
             model.step(.01,cue_phase=.3)
         np.testing.assert_allclose(state.detach().numpy()[0],model.activity,atol=2e-6)
+
+    def test_profile_loss_detects_distortion_hidden_by_first_moment(self):
+        from fly_brain_rc.neural.heading_type_fit import TypeParameterFit
+        trial=TypeParameterFit(self.model())
+        state=torch.full((1,8),.5)
+        state[0,:4]=torch.tensor([.8,.5,.2,.5])
+        clean=trial.profile_loss(state,torch.tensor([0.]))
+        distorted=state.clone()
+        distorted[0,:4]+=torch.tensor([.1,-.1,.1,-.1])
+        self.assertLess(float(clean),1e-10)
+        self.assertGreater(float(trial.profile_loss(distorted,torch.tensor([0.]))),.009)
+
+    def test_equilibrium_residual_matches_observed_rate_change(self):
+        from fly_brain_rc.neural.heading_type_fit import TypeParameterFit
+        trial=TypeParameterFit(self.model())
+        state=torch.full((1,8),.4,requires_grad=True)
+        residual=trial.equilibrium_residual(state)
+        following=trial.step(state,.001)
+        torch.testing.assert_close(residual,(following-state)*trial.tau/.001)
+        residual.square().mean().backward()
+        self.assertTrue(torch.isfinite(trial.log_gain.grad).all())
+
+    def test_equilibrium_probe_rejects_invalid_activity(self):
+        from fly_brain_rc.neural.heading_type_fit import TypeParameterFit
+        trial=TypeParameterFit(self.model())
+        for value in (-.1,1.1,float('nan')):
+            with self.assertRaises(ValueError):
+                trial.equilibrium_residual(torch.full((1,8),value))
