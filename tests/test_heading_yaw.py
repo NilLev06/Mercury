@@ -152,6 +152,13 @@ class HeadingYawTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 main(common+['--checkpoint',str(cp),'--out',str(rejected)])
             self.assertFalse(rejected.exists())
+            motion=root/'motion.pt';continued=root/'motion-continued.pt'
+            main(common+['--checkpoint',str(first),'--out',str(motion),'--objective','motion'])
+            main(common+['--checkpoint',str(motion),'--out',str(continued),'--resume'])
+            self.assertEqual(torch.load(continued,weights_only=True)['objective'],'motion')
+            with self.assertRaises(ValueError):
+                main(common+['--checkpoint',str(motion),'--out',str(root/'changed-objective.pt'),
+                             '--resume','--objective','moment'])
 
     def test_differential_input_opposes_glno_sides_and_survives_export(self):
         from fly_brain_rc.neural.heading_yaw import GLNOYawFit,glno_drive
@@ -161,3 +168,33 @@ class HeadingYawTests(unittest.TestCase):
         np.testing.assert_array_equal(drive,expected)
         a,p,_=yaw_fixture();replay=AnatomicalHeading(a,p,trial.parameters_dict())
         np.testing.assert_array_equal(glno_drive(replay,1.),expected[0])
+
+    def test_motion_objective_scores_speed_without_prescribing_bump_amplitude(self):
+        from fly_brain_rc.neural.heading_yaw import motion_trace_loss
+        phase=torch.tensor([[3.1],[3.14],[3.18]])
+        moments=torch.stack((phase.cos(),phase.sin()),dim=-1)*.2
+        means=torch.ones(3,1)*.5
+        good=motion_trace_loss(moments,means,torch.tensor([.4]),.1)
+        scaled=motion_trace_loss(moments*2,means,torch.tensor([.4]),.1)
+        pinned=motion_trace_loss(moments[:1].expand_as(moments),means,torch.tensor([.4]),.1)
+        self.assertLess(float(good),1e-8)
+        self.assertAlmostEqual(float(good),float(scaled),places=7)
+        self.assertAlmostEqual(float(pinned),.16,places=5)
+
+    def test_motion_objective_does_not_reward_collapsed_activity(self):
+        from fly_brain_rc.neural.heading_yaw import motion_trace_loss
+        moments=torch.zeros(3,1,2);means=torch.ones(3,1)*.5
+        self.assertGreater(float(motion_trace_loss(moments,means,torch.tensor([0.]),.1)),.9)
+        with self.assertRaises(ValueError):
+            motion_trace_loss(moments,means,torch.tensor([0.,1.]),.1)
+
+    def test_motion_training_backpropagates_through_the_fixed_neural_graph(self):
+        from fly_brain_rc.neural.heading_yaw import GLNOYawFit
+        a,p,params=yaw_fixture()
+        a['connections'].append(dict(pre='9',post='2',syn_count=100,neuropil='EB',nt_type='GABA'))
+        trial=GLNOYawFit(AnatomicalHeading(a,p,params))
+        loss=trial.motion_loss(torch.tensor([.2]),torch.tensor([.4]),cue_steps=10,drive_steps=20)
+        loss.backward()
+        self.assertTrue(torch.isfinite(loss))
+        self.assertGreater(abs(float(trial.log_input_gain.grad)),1e-7)
+        self.assertFalse(trial.counts.requires_grad)

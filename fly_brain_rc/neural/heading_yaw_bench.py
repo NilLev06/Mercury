@@ -12,6 +12,47 @@ from .heading_columns import digest
 from .heading_yaw import GLNOYawFit
 
 
+def sensitivity_scores(lower,upper,contrast,offset):
+    """Small initial differences must survive, not coalesce into fixed headings."""
+    lower=np.asarray(lower);upper=np.asarray(upper);contrast=np.asarray(contrast)
+    if (lower.ndim!=1 or not len(lower) or upper.shape!=lower.shape
+            or contrast.shape!=(2,len(lower))
+            or not all(np.isfinite(x).all() for x in (lower,upper,contrast))
+            or np.any(contrast<0) or not math.isfinite(offset) or not 0<offset<=.1):
+        raise ValueError('finite paired angles, contrasts and offset in (0,.1] required')
+    difference=np.arctan2(np.sin(upper-lower),np.cos(upper-lower))
+    sensitivity=difference/(2*offset)
+    valid=(contrast>=.05).all(axis=0)
+    good=valid&(sensitivity>=.5)&(sensitivity<=1.5)
+    return dict(median_sensitivity=float(np.median(sensitivity)),
+                collapsed_pairs=int((np.abs(sensitivity)<.05).sum()),
+                invalid_pairs=int((~valid).sum()),pairs=len(lower),
+                fraction_near_unit_sensitivity=float(good.mean()),
+                passed=bool(valid.all() and good.mean()>=.95))
+
+
+def evaluate_sensitivity(anatomy,phases,parameters,*,seconds=60.,offset=.01,directions=None):
+    directions=tuple(directions if directions is not None else
+                     (-math.pi+.217+i*math.pi/36 for i in range(72)))
+    if (not directions or not all(math.isfinite(v) for v in directions)
+            or not math.isfinite(seconds) or not .01<=seconds<=60
+            or abs(seconds/.01-round(seconds/.01))>1e-8
+            or not math.isfinite(offset) or not 0<offset<=.1):
+        raise ValueError('finite directions, bounded duration and small positive offset required')
+    trial=GLNOYawFit(AnatomicalHeading(anatomy,phases,parameters))
+    phase=torch.tensor(tuple(v-offset for v in directions)+tuple(v+offset for v in directions))
+    with torch.no_grad():
+        state=torch.zeros(len(phase),len(trial.counts))
+        for _ in range(100):state=trial.step(state,.01,cue_phase=phase)
+        for _ in range(round(seconds/.01)):state=trial.step(state,.01)
+        rates=state@trial.groups
+        moment=(rates-rates.mean(1,keepdim=True))@trial.moments
+        angle=torch.atan2(moment[:,1],moment[:,0]).numpy().reshape(2,-1)
+        contrast=(torch.linalg.vector_norm(moment,dim=1)/rates.mean(1).clamp_min(1e-12)).numpy().reshape(2,-1)
+    return dict(**sensitivity_scores(angle[0],angle[1],contrast,offset),
+                seconds=seconds,offset_radians=offset,vehicle_integration_allowed=False)
+
+
 def trajectory_scores(actual,reference,contrast,dt):
     """Score wrapped decoded angles against an unwrapped reference trajectory."""
     actual=np.asarray(actual);reference=np.asarray(reference);contrast=np.asarray(contrast)
@@ -90,6 +131,8 @@ def main():
     for name,segments in cases.items():
         result=evaluate_yaw(anatomy,phases,checkpoint['parameters'],segments=segments)
         print(json.dumps(dict(case=name,**result)),flush=True)
+    print(json.dumps(dict(case='pinning',**evaluate_sensitivity(
+        anatomy,phases,checkpoint['parameters']))),flush=True)
 
 
 if __name__=='__main__':

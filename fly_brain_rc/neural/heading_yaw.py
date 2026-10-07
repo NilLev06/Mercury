@@ -16,6 +16,27 @@ from .anatomical_heading import AnatomicalHeading,extend_phases
 from .heading_columns import digest
 
 
+def motion_trace_loss(moments,means,velocities,dt):
+    """Offline speed calibration, with no prescribed firing-rate profile.
+
+    Decoded moments are never injected into the network. A contrast floor
+    prevents collapsed activity from masquerading as a stationary compass.
+    """
+    if (moments.ndim!=3 or moments.shape[0]<2 or moments.shape[1]<1
+            or moments.shape[2]!=2 or means.shape!=moments.shape[:2]
+            or velocities.shape!=(moments.shape[1],)
+            or not all(torch.isfinite(x).all() for x in (moments,means,velocities))
+            or torch.any(means<0) or torch.any(velocities.abs()>5)
+            or not math.isfinite(dt) or not 0<dt<=1):
+        raise ValueError('finite time x batch moments, means and bounded velocities required')
+    previous,current=moments[:-1],moments[1:]
+    cross=previous[...,0]*current[...,1]-previous[...,1]*current[...,0]
+    dot=(previous*current).sum(-1)
+    speed=torch.atan2(cross,dot+1e-12)/dt
+    contrast=torch.linalg.vector_norm(moments,dim=-1)/means.clamp_min(1e-12)
+    return ((speed-velocities[None,:])**2).mean()+100*(.1-contrast).clamp_min(0).square().mean()
+
+
 def glno_masks(network,positive_side):
     if positive_side not in ('left','right'):
         raise ValueError('positive side must be left or right')
@@ -87,6 +108,31 @@ class GLNOYawFit(TypeParameterFit):
     def step_yaw(self,state,dt,velocities,*,cue_phase=None):
         return self.step(state,dt,cue_phase=cue_phase,external_drive=self.drive(velocities))
 
+    def motion_loss(self,phases,velocities,*,cue_steps=100,drive_steps=200):
+        if (phases.ndim!=1 or not len(phases) or phases.shape!=velocities.shape
+                or not torch.isfinite(phases).all()
+                or isinstance(cue_steps,bool) or not isinstance(cue_steps,int) or cue_steps<1
+                or isinstance(drive_steps,bool) or not isinstance(drive_steps,int) or drive_steps<10
+                or drive_steps%10):
+            raise ValueError('matching finite phases, positive cue steps and drive steps divisible by 10 required')
+        drive=self.drive(velocities)
+        state=torch.zeros(len(phases),len(self.counts),dtype=phases.dtype,device=phases.device)
+        weights=self.weights();cue=self._cue(phases)
+        for _ in range(cue_steps):state=self._advance(state,.01,weights,cue)
+        moments=[];means=[]
+        def record():
+            rates=state@self.groups
+            moments.append((rates-rates.mean(1,keepdim=True))@self.moments)
+            means.append(rates.mean(1))
+        record()
+        for i in range(drive_steps):
+            state=self._advance(state,.01,weights,drive)
+            if (i+1)%10==0:record()
+        loss=motion_trace_loss(torch.stack(moments),torch.stack(means),velocities,.1)
+        regularizer=.001*((self.log_gain-self.initial_log_gain)**2).mean()
+        regularizer+=.001*((self.bias-self.initial_bias)**2).mean()
+        return loss+regularizer
+
     def velocity_loss(self,phases,velocities,*,cue_steps=50,drive_steps=200,speed_weight=.02):
         """Offline supervised ideal rotation task, NOT the paper's exact loss.
 
@@ -141,12 +187,17 @@ def main(argv=None):
     parser.add_argument('--input-mode',choices=['rectified','differential'])
     parser.add_argument('--lr',type=float)
     parser.add_argument('--speed-weight',type=float,default=2.)
+    parser.add_argument('--objective',choices=['moment','motion'])
     args=parser.parse_args(argv)
     if (args.out.exists() or not 1<=args.steps<=10000
             or args.lr is not None and (not math.isfinite(args.lr) or not 0<args.lr<=.1)
             or not math.isfinite(args.speed_weight) or not 0<=args.speed_weight<=100):
         parser.error('new output, bounded steps, finite valid learning settings required')
     checkpoint=torch.load(args.checkpoint,weights_only=True)
+    objective=args.objective or (checkpoint.get('objective','moment') if args.resume else 'moment')
+    if objective not in ('moment','motion') or (args.resume
+            and objective!=checkpoint.get('objective','moment')):
+        raise ValueError('resume requires the original calibration objective')
     if (checkpoint.get('anatomy_sha256')!=digest(args.anatomy)
             or checkpoint.get('phases_sha256')!=digest(args.phases)):
         raise ValueError('checkpoint input provenance does not match')
@@ -170,6 +221,7 @@ def main(argv=None):
         context=('counts','sign','type_indices','cue_indices','cue_phases','groups','moments',
                  'positive_glno','negative_glno','positive_side_code','input_mode_code')
         if not learn_tau:context=context+('tau',)
+        if hasattr(trial,'neuron_offsets'):context=context+('neuron_offsets',)
         if any(name not in state or not torch.equal(state[name],getattr(trial,name)) for name in context):
             raise ValueError('checkpoint fixed context does not match')
         trial.load_state_dict(state)
@@ -182,7 +234,8 @@ def main(argv=None):
         phase=(torch.tensor([-2.,0.,2.])+(completed+i)*.381966).repeat_interleave(7)
         velocity=torch.tensor([-.8,-.4,-.15,0.,.15,.4,.8]).repeat(3)
         optimizer.zero_grad()
-        loss=trial.velocity_loss(phase,velocity,speed_weight=args.speed_weight)
+        loss=(trial.motion_loss(phase,velocity) if objective=='motion' else
+              trial.velocity_loss(phase,velocity,speed_weight=args.speed_weight))
         if not torch.isfinite(loss):raise RuntimeError('nonfinite yaw loss; checkpoint not written')
         loss.backward();torch.nn.utils.clip_grad_norm_(trial.parameters(),5.);optimizer.step()
         history.append(float(loss.detach()))
@@ -196,7 +249,7 @@ def main(argv=None):
                                       synapse_scale=network.parameters['synapse_scale'],
                                       cue_strength=network.parameters['cue_strength']),
                 parameters=trial.parameters_dict(),state_dict=trial.state_dict(),
-                optimizer=optimizer.state_dict(),learn_tau=learn_tau,
+                optimizer=optimizer.state_dict(),learn_tau=learn_tau,objective=objective,
                 speed_weight=args.speed_weight,run_loss_history=history,
                 anatomy_sha256=digest(args.anatomy),phases_sha256=digest(args.phases),
                 root_ids=network.root_ids,parent_checkpoint_sha256=digest(args.checkpoint),

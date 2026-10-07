@@ -105,6 +105,12 @@ class AnatomicalHeading:
         self._weights=counts/scale*gains
         self._weights.flags.writeable=False
         self._bias=np.array([parameters['bias'][kind] for kind in self._parameter_types])
+        offsets=parameters.get('neuron_bias_offsets')
+        if offsets is not None:
+            if (not isinstance(offsets,dict) or set(offsets)!=set(self.root_ids)
+                    or not all(math.isfinite(v) and abs(v)<=10 for v in offsets.values())):
+                raise ValueError('finite individual bias offsets require an exact neuron identity join')
+            self._bias+=np.array([offsets[root] for root in self.root_ids])
         self._tau=np.array([parameters['tau'][kind] for kind in self._parameter_types])
         self._cue_strength=strength
         phase_by_id={}

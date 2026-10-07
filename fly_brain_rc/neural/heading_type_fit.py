@@ -21,6 +21,7 @@ from .heading_columns import digest
 class TypeParameterFit(nn.Module):
     def __init__(self, network, *, learn_tau=False):
         super().__init__()
+        self.root_ids=network.root_ids
         self.recurrence=network.recurrence
         self.kinds=tuple(sorted(set(network._parameter_types)))
         index={kind:i for i,kind in enumerate(self.kinds)}
@@ -43,6 +44,9 @@ class TypeParameterFit(nn.Module):
         self.register_buffer('moments',torch.stack((angles.cos(),angles.sin()),dim=1)/len(angles))
         self.log_gain=nn.Parameter(gains.abs().log())
         self.bias=nn.Parameter(torch.tensor([p['bias'][k] for k in self.kinds]))
+        if p.get('neuron_bias_offsets') is not None:
+            self.register_buffer('neuron_offsets',torch.tensor(
+                [p['neuron_bias_offsets'][root] for root in self.root_ids],dtype=torch.float32))
         if learn_tau:
             self.log_tau=nn.Parameter(torch.tensor([math.log(p['tau'][k]) for k in self.kinds]))
         else:
@@ -67,12 +71,16 @@ class TypeParameterFit(nn.Module):
             math.log(.005),math.log(1.)).exp()[self.type_indices]
         steps=max(1,math.ceil(dt/min(.01,float(tau.detach().min())/5)))
         h=dt/steps
-        bias=self.bias.clamp(-10,10)[self.type_indices]
+        bias=self._bias_values()
         for _ in range(steps):
             feedback=state@weights.T if self.recurrence else 0.
             target=torch.sigmoid((feedback+bias+cue).clamp(-60,60))
             state=state+h/tau*(target-state)
         return state
+
+    def _bias_values(self):
+        bias=self.bias.clamp(-10,10)[self.type_indices]
+        return bias+self.neuron_offsets.clamp(-10,10) if hasattr(self,'neuron_offsets') else bias
 
     def step(self,state,dt,*,cue_phase=None,external_drive=None):
         if not math.isfinite(dt) or not 0<dt<=1:
@@ -99,7 +107,7 @@ class TypeParameterFit(nn.Module):
                 or not torch.isfinite(state).all() or torch.any((state<0)|(state>1))):
             raise ValueError('finite bounded batch x neuron activity required')
         feedback=state@self.weights().T if self.recurrence else 0.
-        drive=feedback+self.bias.clamp(-10,10)[self.type_indices]
+        drive=feedback+self._bias_values()
         return torch.sigmoid(drive.clamp(-60,60))-state
 
     def profile_loss(self,state,phases):
@@ -145,6 +153,9 @@ class TypeParameterFit(nn.Module):
         p['gain']={post:{pre:float(gains[i,j]) for j,pre in enumerate(self.kinds)}
                    for i,post in enumerate(self.kinds)}
         p['bias']={k:float(bias[i]) for i,k in enumerate(self.kinds)}
+        if hasattr(self,'neuron_offsets'):
+            offsets=self.neuron_offsets.detach().clamp(-10,10).cpu().numpy()
+            p['neuron_bias_offsets']={root:float(offsets[i]) for i,root in enumerate(self.root_ids)}
         if self.log_tau is not None:
             tau=self.log_tau.detach().clamp(math.log(.005),math.log(1.)).exp().cpu().numpy()
             p['tau']={k:max(.005,min(1.,float(tau[i]))) for i,k in enumerate(self.kinds)}
