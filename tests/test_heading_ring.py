@@ -8,6 +8,30 @@ def error(a,b):
 
 
 class HeadingRingTests(unittest.TestCase):
+    def test_long_turn_does_not_accumulate_large_lag_error(self):
+        for velocity in (-2.,2.):
+            ring=self.ring();initial=ring.heading
+            for _ in range(6000):ring.step(velocity,.01)
+            self.assertLess(error(ring.heading,initial+60*velocity),math.radians(5))
+
+    def test_small_feedback_gain_errors_do_not_destroy_dark_memory(self):
+        for gain in (.95,.99,1.01,1.05):
+            ring=self.ring();initial=ring.heading
+            ring._positive*=gain;ring._negative*=gain
+            for _ in range(6000):ring.step(0.,.01)
+            self.assertIsNotNone(ring.heading)
+            self.assertLess(error(ring.heading,initial),math.radians(2))
+            self.assertGreater(ring.contrast,.1)
+
+    def test_radial_disturbance_recovers_without_changing_phase(self):
+        ring=self.ring();initial=ring.heading
+        ring._compass=1+.25*(ring.activity-1)
+        ring._left=1+.25*(ring._left-1)
+        ring._right=1+.25*(ring._right-1)
+        for _ in range(1000):ring.step(0.,.01)
+        self.assertGreater(ring.contrast,.35)
+        self.assertLess(error(ring.heading,initial),.02)
+
     def ring(self,**kwargs):
         from fly_brain_rc.neural.heading_ring import HeadingRing
         ring=HeadingRing(**kwargs)

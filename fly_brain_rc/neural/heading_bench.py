@@ -54,7 +54,7 @@ def run_bench(*,phases=None,velocities=(-2.,-1.,-.5,-.2,-.05,.05,.2,.5,1.,2.)):
                                          error_degrees=_error(long_turn.heading,initial+40),
                                          contrast=long_turn.contrast),
                 limitations=['Synthetic sectors and effective signed feedback, not anatomical weights.',
-                             'Neutral first-harmonic memory, not robust amplitude-restoring bump attraction.',
+                             'Amplitude restoring controller and lag compensation are synthetic, not anatomical.',
                              'Ideal cue adapter bypasses the visual system.',
                              'Only noiseless inputs tested; small-rate nonlinearities and long-run drift remain.',
                              'No proof of spontaneous bump formation or biological neuron fidelity.',
