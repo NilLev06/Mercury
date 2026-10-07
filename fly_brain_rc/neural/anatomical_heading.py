@@ -7,7 +7,7 @@ import copy
 import math
 import numpy as np
 
-from .heading_connectome import HEADING_TYPES
+from .heading_connectome import HEADING_TYPES, HEADING_INPUT_TYPES
 from .heading_columns import selected_neurons
 
 
@@ -18,6 +18,46 @@ def pilot_parameters(excitation=4., delta7_gain=-4.):
                 bias={kind:-2. for kind in HEADING_TYPES},
                 tau={kind:.05 for kind in HEADING_TYPES},
                 synapse_scale=1000., cue_strength=6.)
+
+
+def expanded_parameters(anatomy):
+    """Explicit sign hypotheses, not receptor inference from predicted NT.
+
+    ER and GLNO: inhibitory; cholinergic ExR4/7/8: excitatory. Mixed ExR1/6
+    treated as inhibitory. Dopaminergic ExR2/3 treated as excitatory effective
+    inputs for this pilot only; real neuromodulation is NOT represented.
+    """
+    kinds=tuple(sorted({n['cell_type'] for n in anatomy['neurons']}))
+    negative={'Delta7','GLNO','ExR1','ExR5','ExR6'}
+    negative.update(k for k in kinds if k.startswith('ER'))
+    return dict(gain={post:{pre:-4. if pre in negative else 4. for pre in kinds}
+                      for post in kinds},
+                bias={k:-2. for k in kinds},tau={k:.05 for k in kinds},
+                synapse_scale=1000.,cue_strength=6.)
+
+
+def extend_phases(anatomy,phases):
+    """Keep existing EPG evidence; new inputs receive no fabricated angles."""
+    old={row['root_id']:row for row in phases['neurons']}
+    if len(old)!=len(phases['neurons']):
+        raise ValueError('duplicate phase identities')
+    neurons=selected_neurons(anatomy)
+    if not set(old)<=set(neurons):
+        raise ValueError('phase identity missing from expanded graph')
+    result=copy.deepcopy(phases)
+    result['neurons']=[]
+    for root,neuron in neurons.items():
+        if root in old:
+            row=copy.deepcopy(old[root])
+            if row['cell_type']!=neuron['cell_type']:
+                raise ValueError('phase type changed in expanded graph')
+        elif neuron['cell_type'] in HEADING_INPUT_TYPES:
+            row=dict(root_id=root,cell_type=neuron['cell_type'],phase_degrees=None,
+                     status='unresolved',candidate_columns=None)
+        else:
+            raise ValueError('core neuron has no prior phase audit')
+        result['neurons'].append(row)
+    return result
 
 
 class AnatomicalHeading:
@@ -39,7 +79,7 @@ class AnatomicalHeading:
             raise ValueError('empty anatomical connectivity')
         self._counts=counts
         self._parameters=copy.deepcopy(parameters)
-        kinds=set(HEADING_TYPES)
+        kinds=set(self._types)
         for field in ('gain','bias','tau'):
             if set(parameters[field])!=kinds:
                 raise ValueError('parameters must cover exactly the selected cell types')

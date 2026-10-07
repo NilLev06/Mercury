@@ -12,6 +12,9 @@ from pathlib import Path
 
 
 HEADING_TYPES = ('EPG','PEN_a/PEN1','PEN_b/PEN2','PEG','Delta7')
+HEADING_INPUT_TYPES = ('GLNO','ER1','ER2','ER3a','ER3d','ER3m','ER3p','ER3w',
+                       'ER4d','ER4m','ER5','ER6','ExR1','ExR2_1','ExR2_2',
+                       'ExR3','ExR4','ExR5','ExR6','ExR7','ExR8')
 
 
 def _sha256(path):
@@ -30,11 +33,12 @@ def _rows(path,required):
         yield from reader
 
 
-def extract_heading_circuit(cells_path,connections_path):
+def extract_heading_circuit(cells_path,connections_path,*,include_inputs=False):
+    selected_types=HEADING_TYPES+HEADING_INPUT_TYPES if include_inputs else HEADING_TYPES
     neurons={}
     for row in _rows(cells_path,{'root_id','primary_type'}):
         kind=row['primary_type'].strip()
-        if kind not in HEADING_TYPES:
+        if kind not in selected_types:
             continue
         root=row['root_id'].strip()
         if not root.isdigit() or root in neurons:
@@ -75,8 +79,9 @@ def main():
     parser.add_argument('--cells',type=Path,required=True)
     parser.add_argument('--connections',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--include-inputs',action='store_true')
     args=parser.parse_args()
-    result=extract_heading_circuit(args.cells,args.connections)
+    result=extract_heading_circuit(args.cells,args.connections,include_inputs=args.include_inputs)
     # Avoid accidental destruction of an earlier anatomical report.
     args.out.parent.mkdir(parents=True,exist_ok=True)
     with args.out.open('x') as stream:

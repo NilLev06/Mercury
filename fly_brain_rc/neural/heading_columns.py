@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import re
+from .heading_connectome import HEADING_TYPES, HEADING_INPUT_TYPES
 
 NBLAST_MD5 = '3ca6d79615e1cd30b37f32a8ae845f32'
 META_SHA256 = 'cf1c6d1821cf9179584e2ba89a614bd1b184234e547b660d378c964ed46fd9e1'
@@ -21,7 +22,7 @@ def selected_neurons(anatomy):
     for neuron in anatomy['neurons']:
         root = neuron['root_id']
         if (not isinstance(root, str) or not root.isdigit() or root in selected
-                or neuron['cell_type'] not in ('EPG', 'PEG', 'Delta7', *ALIASES)):
+                or neuron['cell_type'] not in HEADING_TYPES+HEADING_INPUT_TYPES):
             raise ValueError('invalid selected neuron identifier or cell type')
         selected[root] = neuron
     if not selected:
