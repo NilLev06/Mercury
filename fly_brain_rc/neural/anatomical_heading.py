@@ -162,14 +162,19 @@ class AnatomicalHeading:
     def contrast(self):
         return self._decode()[1]
 
-    def step(self, dt, *, cue_phase=None):
+    def step(self, dt, *, cue_phase=None, external_drive=None):
         if (not math.isfinite(dt) or not 0<dt<=1
                 or (cue_phase is not None and not math.isfinite(cue_phase))):
             raise ValueError('finite cue and 0<dt<=1 required')
         cue=np.zeros(len(self.root_ids))
+        if external_drive is not None:
+            drive=np.asarray(external_drive,dtype=float)
+            if drive.shape!=cue.shape or not np.isfinite(drive).all() or np.any(np.abs(drive)>100):
+                raise ValueError('finite neuron-sized external drive bounded by 100 required')
+            cue+=drive
         if cue_phase is not None:
             # Ideal modulation around baseline, not an anatomical visual pathway.
-            cue[self._cue_indices]=self._cue_strength*np.cos(self._cue_phases-cue_phase)
+            cue[self._cue_indices]+=self._cue_strength*np.cos(self._cue_phases-cue_phase)
         steps=max(1,math.ceil(dt/min(.01,float(self._tau.min())/5)))
         h=dt/steps
         for _ in range(steps):

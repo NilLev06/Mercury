@@ -19,7 +19,7 @@ from .heading_columns import digest
 
 
 class TypeParameterFit(nn.Module):
-    def __init__(self, network):
+    def __init__(self, network, *, learn_tau=False):
         super().__init__()
         self.recurrence=network.recurrence
         self.kinds=tuple(sorted(set(network._parameter_types)))
@@ -43,6 +43,10 @@ class TypeParameterFit(nn.Module):
         self.register_buffer('moments',torch.stack((angles.cos(),angles.sin()),dim=1)/len(angles))
         self.log_gain=nn.Parameter(gains.abs().log())
         self.bias=nn.Parameter(torch.tensor([p['bias'][k] for k in self.kinds]))
+        if learn_tau:
+            self.log_tau=nn.Parameter(torch.tensor([math.log(p['tau'][k]) for k in self.kinds]))
+        else:
+            self.register_parameter('log_tau',None)
         self.register_buffer('initial_log_gain',self.log_gain.detach().clone())
         self.register_buffer('initial_bias',self.bias.detach().clone())
         self._base_parameters=p
@@ -59,16 +63,18 @@ class TypeParameterFit(nn.Module):
         return cue
 
     def _advance(self,state,dt,weights,cue):
-        steps=max(1,math.ceil(dt/min(.01,float(self.tau.min())/5)))
+        tau=self.tau if self.log_tau is None else self.log_tau.clamp(
+            math.log(.005),math.log(1.)).exp()[self.type_indices]
+        steps=max(1,math.ceil(dt/min(.01,float(tau.detach().min())/5)))
         h=dt/steps
         bias=self.bias.clamp(-10,10)[self.type_indices]
         for _ in range(steps):
             feedback=state@weights.T if self.recurrence else 0.
             target=torch.sigmoid((feedback+bias+cue).clamp(-60,60))
-            state=state+h/self.tau*(target-state)
+            state=state+h/tau*(target-state)
         return state
 
-    def step(self,state,dt,*,cue_phase=None):
+    def step(self,state,dt,*,cue_phase=None,external_drive=None):
         if not math.isfinite(dt) or not 0<dt<=1:
             raise ValueError('0<dt<=1 required')
         if state.ndim!=2 or state.shape[1]!=len(self.counts) or not torch.isfinite(state).all():
@@ -78,6 +84,11 @@ class TypeParameterFit(nn.Module):
             if cue_phase.shape!=(len(state),) or not torch.isfinite(cue_phase).all():
                 raise ValueError('finite cue phase per batch element required')
             cue=self._cue(cue_phase)
+        if external_drive is not None:
+            if (external_drive.shape!=state.shape or not torch.isfinite(external_drive).all()
+                    or torch.any(external_drive.abs()>100)):
+                raise ValueError('finite batch x neuron external drive bounded by 100 required')
+            cue=cue+external_drive
         return self._advance(state,dt,self.weights(),cue)
 
     def equilibrium_residual(self,state):
@@ -134,6 +145,9 @@ class TypeParameterFit(nn.Module):
         p['gain']={post:{pre:float(gains[i,j]) for j,pre in enumerate(self.kinds)}
                    for i,post in enumerate(self.kinds)}
         p['bias']={k:float(bias[i]) for i,k in enumerate(self.kinds)}
+        if self.log_tau is not None:
+            tau=self.log_tau.detach().clamp(math.log(.005),math.log(1.)).exp().cpu().numpy()
+            p['tau']={k:max(.005,min(1.,float(tau[i]))) for i,k in enumerate(self.kinds)}
         return p
 
 
