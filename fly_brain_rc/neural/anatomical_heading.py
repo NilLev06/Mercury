@@ -1,0 +1,132 @@
+"""Isolated rate dynamics on measured directed FlyWire heading connections.
+
+Topology/counts are anatomical; gains, biases, time constants, sign hypotheses
+and ideal cue are not validated physiology. No camera, yaw adapter or car control.
+"""
+import copy
+import math
+import numpy as np
+
+from .heading_connectome import HEADING_TYPES
+from .heading_columns import selected_neurons
+
+
+def pilot_parameters(excitation=4., delta7_gain=-4.):
+    """Unfitted engineering starting point; negative Delta7 is an assumption."""
+    return dict(gain={post:{pre:float(delta7_gain if pre=='Delta7' else excitation)
+                           for pre in HEADING_TYPES} for post in HEADING_TYPES},
+                bias={kind:-2. for kind in HEADING_TYPES},
+                tau={kind:.05 for kind in HEADING_TYPES},
+                synapse_scale=1000., cue_strength=6.)
+
+
+class AnatomicalHeading:
+    DECODE_THRESHOLD=.05
+
+    def __init__(self, anatomy, phases, parameters, *, recurrence=True):
+        neurons=selected_neurons(anatomy)
+        self.root_ids=tuple(neurons)
+        self._index={root:i for i,root in enumerate(self.root_ids)}
+        self._types=tuple(neurons[root]['cell_type'] for root in self.root_ids)
+        counts=np.zeros((len(neurons),len(neurons)),dtype=np.int64)
+        for row in anatomy['connections']:
+            pre,post,count=row['pre'],row['post'],row['syn_count']
+            if (pre not in neurons or post not in neurons or isinstance(count,bool)
+                    or not isinstance(count,int) or count<=0):
+                raise ValueError('invalid anatomical edge or synapse count')
+            counts[self._index[post],self._index[pre]]+=count
+        if not counts.any():
+            raise ValueError('empty anatomical connectivity')
+        self._counts=counts
+        self._parameters=copy.deepcopy(parameters)
+        kinds=set(HEADING_TYPES)
+        for field in ('gain','bias','tau'):
+            if set(parameters[field])!=kinds:
+                raise ValueError('parameters must cover exactly the selected cell types')
+        for row in parameters['gain'].values():
+            if set(row)!=kinds or not all(math.isfinite(v) and abs(v)<=100 for v in row.values()):
+                raise ValueError('invalid type-pair gains')
+        if not all(math.isfinite(v) and abs(v)<=100 for v in parameters['bias'].values()):
+            raise ValueError('invalid type biases')
+        if not all(math.isfinite(v) and .005<=v<=1 for v in parameters['tau'].values()):
+            raise ValueError('supported time constants are 0.005 to 1 seconds')
+        scale=parameters['synapse_scale'];strength=parameters['cue_strength']
+        if not math.isfinite(scale) or scale<=0 or not math.isfinite(strength) or not 0<=strength<=100:
+            raise ValueError('invalid scale or cue strength')
+        gains=np.array([[parameters['gain'][post][pre] for pre in self._types]
+                        for post in self._types])
+        self._weights=counts/scale*gains
+        self._weights.flags.writeable=False
+        self._bias=np.array([parameters['bias'][kind] for kind in self._types])
+        self._tau=np.array([parameters['tau'][kind] for kind in self._types])
+        self._cue_strength=strength
+        phase_by_id={}
+        for row in phases['neurons']:
+            root=row['root_id'];value=row.get('phase_degrees')
+            if (root not in neurons or root in phase_by_id
+                    or row['cell_type']!=neurons[root]['cell_type']):
+                raise ValueError('phase identities do not match anatomical neurons')
+            if value is not None and (row['cell_type']!='EPG'
+                    or row.get('status')!='phase_hypothesis' or not math.isfinite(value)):
+                raise ValueError('only finite EPG phase hypotheses are supported')
+            phase_by_id[root]=value
+        if set(phase_by_id)!=set(neurons):
+            raise ValueError('missing anatomical neuron in phase report')
+        groups={}
+        self._cue_indices=[];self._cue_phases=[]
+        for root,value in phase_by_id.items():
+            if value is not None:
+                angle=math.radians(round(value % 360.,8))
+                groups.setdefault(angle,[]).append(self._index[root])
+                self._cue_indices.append(self._index[root]);self._cue_phases.append(angle)
+        if len(groups)<4:
+            raise ValueError('at least four distinct EPG phase hypotheses required')
+        self._groups=tuple(groups.values())
+        self._directions=np.exp(1j*np.array(list(groups)))
+        self._cue_indices=np.array(self._cue_indices)
+        self._cue_phases=np.array(self._cue_phases)
+        self._activity=np.zeros(len(neurons))
+        self.recurrence=recurrence
+
+    @property
+    def parameters(self):
+        return copy.deepcopy(self._parameters)
+
+    @property
+    def synapse_counts(self):
+        return self._counts.copy()
+
+    @property
+    def activity(self):
+        return self._activity.copy()
+
+    def _decode(self):
+        # One contribution per column, not per neuron; center out constant rates.
+        rates=np.array([self._activity[indices].mean() for indices in self._groups])
+        vector=np.dot(rates-rates.mean(),self._directions)
+        contrast=float(abs(vector)/max(rates.sum(),1e-12))
+        return float(np.angle(vector)) if contrast>=self.DECODE_THRESHOLD else None,contrast
+
+    @property
+    def heading(self):
+        return self._decode()[0]
+
+    @property
+    def contrast(self):
+        return self._decode()[1]
+
+    def step(self, dt, *, cue_phase=None):
+        if (not math.isfinite(dt) or not 0<dt<=1
+                or (cue_phase is not None and not math.isfinite(cue_phase))):
+            raise ValueError('finite cue and 0<dt<=1 required')
+        cue=np.zeros(len(self.root_ids))
+        if cue_phase is not None:
+            # Ideal modulation around baseline, not an anatomical visual pathway.
+            cue[self._cue_indices]=self._cue_strength*np.cos(self._cue_phases-cue_phase)
+        steps=max(1,math.ceil(dt/min(.01,float(self._tau.min())/5)))
+        h=dt/steps
+        for _ in range(steps):
+            feedback=(np.einsum('ij,j->i',self._weights,self._activity)
+                      if self.recurrence else 0.)
+            target=1/(1+np.exp(-np.clip(feedback+self._bias+cue,-60,60)))
+            self._activity+=h/self._tau*(target-self._activity)
