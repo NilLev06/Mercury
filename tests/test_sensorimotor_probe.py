@@ -14,4 +14,3 @@ class SensorimotorProbeTests(unittest.TestCase):
 
     def test_rejects_invalid_trial_settings(self):
         with self.assertRaises(ValueError):evaluate_channels({},samples=1)
-
