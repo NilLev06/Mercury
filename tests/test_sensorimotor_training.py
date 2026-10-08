@@ -4,7 +4,7 @@ import unittest
 import torch
 
 from fly_brain_rc.imitation.sensorimotor_policy import SensorimotorPolicy
-from fly_brain_rc.imitation.sensorimotor_training import cache_demonstrations,fit_cached,save_trial,load_trial,fit_interfaces
+from fly_brain_rc.imitation.sensorimotor_training import cache_demonstrations,fit_cached,save_trial,load_trial,fit_interfaces,fit_memory
 
 
 def policy():
@@ -13,6 +13,51 @@ def policy():
 
 
 class SensorimotorTrainingTests(unittest.TestCase):
+    def test_joint_interface_memory_fit_replays_history_from_episode_start(self):
+        torch.manual_seed(3)
+        model=SensorimotorPolicy(policy().graph,learned_input=True,motor_memory=True)
+        with torch.no_grad():model.memory_readout.weight.fill_(1.)
+        x=torch.zeros(80,19);x[:12,0]=1;x[:12,2]=1
+        y=torch.zeros(80,2)
+        seed=0;generator=torch.Generator().manual_seed(seed)
+        torch.randint(1,(1,),generator=generator)
+        start=int(torch.randint(80,(),generator=generator))
+        self.assertGreater(start,24)
+        with torch.no_grad():expected=float(model(x[None])[0][0,start].square().mean())
+        torch.manual_seed(seed)
+        optimizer=torch.optim.Adam(model.parameters(),lr=.001)
+        actual=fit_interfaces(model,optimizer,[(x,y)],updates=1,batch_size=1,sequence_length=1)
+        self.assertAlmostEqual(actual,expected,places=9)
+
+    def test_motor_memory_fit_and_resume_preserve_frozen_core(self):
+        torch.manual_seed(10);model=SensorimotorPolicy(policy().graph,motor_memory=True)
+        data=[(torch.rand(n,19),torch.ones(n,2)*.3) for n in (1,30)]
+        cache=cache_demonstrations(model,data)
+        optimizer=torch.optim.Adam(model.parameters(),lr=.01)
+        before=model.core.weights.to_dense().clone()
+        fit_memory(model,optimizer,cache,updates=3,batch_size=2,sequence_length=8)
+        self.assertGreater(model.memory_readout.weight.abs().sum().item(),0)
+        self.assertTrue(torch.equal(before,model.core.weights.to_dense()))
+        with self.assertRaises(ValueError):fit_cached(model,optimizer,cache,updates=1)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'trial.pt'
+            save_trial(path,model,optimizer,data,rounds=1)
+            fit_memory(model,optimizer,cache,updates=2,batch_size=2,sequence_length=8)
+            restored,opt,replay,_=load_trial(path)
+            self.assertTrue(restored.motor_memory)
+            fit_memory(restored,opt,cache_demonstrations(restored,replay),updates=2,batch_size=2,sequence_length=8)
+            for actual,expected in zip(restored.parameters(),model.parameters()):
+                self.assertTrue(torch.equal(actual,expected))
+
+    def test_recurrent_cache_loss_excludes_padding(self):
+        torch.manual_seed(21);model=SensorimotorPolicy(policy().graph,motor_memory=True)
+        with torch.no_grad():
+            for p in model.head.parameters():p.zero_()
+        cache=[(torch.zeros(n,1),torch.full((n,2),.2)) for n in (1,80)]
+        optimizer=torch.optim.Adam(model.parameters(),lr=.001)
+        loss=fit_memory(model,optimizer,cache,updates=1,batch_size=16,sequence_length=8)
+        self.assertAlmostEqual(loss,.04,places=6)
+
     def test_interface_fit_updates_encoder_without_changing_anatomy(self):
         torch.manual_seed(8)
         model=SensorimotorPolicy(policy().graph,learned_input=True)

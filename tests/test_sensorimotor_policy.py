@@ -5,6 +5,38 @@ from fly_brain_rc.imitation.sensorimotor_policy import SensorimotorPolicy, obser
 
 
 class SensorimotorPolicyTests(unittest.TestCase):
+    def test_motor_memory_preserves_chunked_inference_and_zero_residual_baseline(self):
+        g=dict(ids=['0','1','2'],edges=[[0,2,5],[1,2,5]],neurons=[{}]*3,
+            inputs={'LC10a:left':[0],'LC10a:right':[1]},outputs=[2])
+        old=SensorimotorPolicy(g);model=SensorimotorPolicy(g,motor_memory=True)
+        model.head.load_state_dict(old.head.state_dict())
+        x=torch.rand(2,12,19)
+        full,state=model(x)
+        a,s=model(x[:,:5]);b,s=model(x[:,5:],s)
+        self.assertTrue(torch.allclose(full,torch.cat((a,b),1),atol=1e-7))
+        self.assertTrue(torch.allclose(state,s,atol=1e-7))
+        self.assertTrue(torch.equal(old(x)[0],full))
+        self.assertEqual(state.shape,(2,19))
+
+    def test_motor_memory_cannot_receive_observations_without_anatomical_edges(self):
+        g=dict(ids=['0','1','2'],edges=[],neurons=[{}]*3,
+            inputs={'LC10a:left':[0],'LC10a:right':[1]},outputs=[2])
+        model=SensorimotorPolicy(g,motor_memory=True)
+        with torch.no_grad():model.memory_readout.weight.fill_(.2)
+        x=torch.zeros(2,30,19);x[1,:,0]=1
+        y,s=model(x)
+        self.assertTrue(torch.equal(y[0],y[1]))
+        self.assertTrue(torch.equal(s[0,3:],s[1,3:]))
+
+    def test_motor_memory_distinguishes_neural_history_after_common_input(self):
+        g=dict(ids=['0','1','2'],edges=[[0,2,5],[1,2,5]],neurons=[{}]*3,
+            inputs={'LC10a:left':[0],'LC10a:right':[1]},outputs=[2])
+        torch.manual_seed(4);model=SensorimotorPolicy(g,motor_memory=True)
+        x=torch.zeros(2,20,19);x[1,:,0]=1
+        _,s=model(x)
+        _,s=model(torch.zeros(2,5,19),s)
+        self.assertGreater((s[0,3:]-s[1,3:]).abs().sum().item(),1e-5)
+
     def test_target_direction_routes_to_separate_sides_without_hidden_goal(self):
         x=torch.zeros(2,19);x[:,0]=1;x[0,1]=-1;x[1,1]=1
         names=('LC10a:left','LC10a:right')
