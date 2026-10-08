@@ -4,7 +4,7 @@ import unittest
 import torch
 
 from fly_brain_rc.imitation.sensorimotor_policy import SensorimotorPolicy
-from fly_brain_rc.imitation.sensorimotor_training import cache_demonstrations,fit_cached,save_trial,load_trial
+from fly_brain_rc.imitation.sensorimotor_training import cache_demonstrations,fit_cached,save_trial,load_trial,fit_interfaces
 
 
 def policy():
@@ -13,6 +13,63 @@ def policy():
 
 
 class SensorimotorTrainingTests(unittest.TestCase):
+    def test_interface_fit_updates_encoder_without_changing_anatomy(self):
+        torch.manual_seed(8)
+        model=SensorimotorPolicy(policy().graph,learned_input=True)
+        optimizer=torch.optim.Adam(model.parameters(),lr=.002)
+        x=torch.zeros(8,19);x[:,12]=1
+        data=[(x,torch.ones(8,2)*.4)]
+        before=model.core.weights.to_dense().clone()
+        fit_interfaces(model,optimizer,data,updates=3,batch_size=2,sequence_length=4)
+        self.assertGreater(model.encoder[-1].weight.abs().sum().item(),0)
+        self.assertTrue(torch.equal(before,model.core.weights.to_dense()))
+        with self.assertRaises(ValueError):
+            fit_cached(model,optimizer,cache_demonstrations(model,data),updates=1)
+
+    def test_learned_interface_resume_preserves_both_adapters(self):
+        torch.manual_seed(4)
+        model=SensorimotorPolicy(policy().graph,learned_input=True)
+        optimizer=torch.optim.Adam(model.parameters(),lr=.002)
+        data=[(torch.rand(8,19),torch.zeros(8,2))]
+        fit_interfaces(model,optimizer,data,updates=2,batch_size=2,sequence_length=4)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'trial.pt'
+            save_trial(path,model,optimizer,data,rounds=1)
+            fit_interfaces(model,optimizer,data,updates=2,batch_size=2,sequence_length=4)
+            restored,opt,replay,_=load_trial(path)
+            self.assertTrue(restored.learned_input)
+            fit_interfaces(restored,opt,replay,updates=2,batch_size=2,sequence_length=4)
+            for actual,expected in zip(restored.parameters(),model.parameters()):
+                self.assertTrue(torch.equal(actual,expected))
+
+    def test_resume_restores_named_optimizer_groups_and_parameter_order(self):
+        torch.manual_seed(7)
+        model=SensorimotorPolicy(policy().graph,learned_input=True)
+        optimizer=torch.optim.Adam([
+            {'params':list(model.head.parameters()),'lr':.001},
+            {'params':list(model.encoder.parameters()),'lr':.003}])
+        data=[(torch.rand(8,19),torch.zeros(8,2))]
+        fit_interfaces(model,optimizer,data,updates=2,batch_size=2,sequence_length=4)
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'trial.pt'
+            save_trial(path,model,optimizer,data,rounds=1)
+            fit_interfaces(model,optimizer,data,updates=2,batch_size=2,sequence_length=4)
+            restored,opt,replay,_=load_trial(path)
+            fit_interfaces(restored,opt,replay,updates=2,batch_size=2,sequence_length=4)
+            self.assertEqual([g['lr'] for g in opt.param_groups],[.001,.003])
+            for actual,expected in zip(restored.parameters(),model.parameters()):
+                self.assertTrue(torch.equal(actual,expected))
+
+    def test_interface_loss_excludes_padding_for_unequal_episodes(self):
+        torch.manual_seed(21)
+        model=SensorimotorPolicy(policy().graph,learned_input=True)
+        with torch.no_grad():
+            for p in model.head.parameters():p.zero_()
+        optimizer=torch.optim.Adam(model.parameters(),lr=.001)
+        data=[(torch.zeros(n,19),torch.full((n,2),.2)) for n in (1,80)]
+        loss=fit_interfaces(model,optimizer,data,updates=1,batch_size=16,sequence_length=8)
+        self.assertAlmostEqual(loss,.04,places=6)
+
     def test_cached_features_match_live_forward_and_reset_each_episode(self):
         model=policy();x=torch.zeros(12,19);x[:,0]=1;x[:,2]=.5
         data=[(x,torch.zeros(12,2)),(x,torch.zeros(12,2))]

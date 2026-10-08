@@ -31,23 +31,37 @@ def observable_drive(x,channels):
 
 
 class SensorimotorPolicy(nn.Module):
-    def __init__(self,graph):
+    def __init__(self,graph,*,learned_input=False):
         super().__init__()
         self.graph=graph
         self.core=SensorimotorCore(graph)
+        self.learned_input=learned_input
+        if learned_input:
+            # A vehicle-to-population interface, NOT biological tuning curves.
+            # No observation is discarded before the learned projection.
+            self.encoder=nn.Sequential(nn.Linear(INPUT_SIZE,16),nn.Tanh(),
+                                       nn.Linear(16,len(self.core.channels)))
+            nn.init.zeros_(self.encoder[-1].weight)
+            nn.init.zeros_(self.encoder[-1].bias)
         self.head=nn.Sequential(nn.Linear(len(graph['outputs']),16),nn.Tanh(),nn.Linear(16,2))
         self.register_buffer('feature_mean',torch.zeros(len(graph['outputs'])))
         self.register_buffer('feature_scale',torch.ones(len(graph['outputs'])))
+
+    def input_drive(self,frame):
+        base=observable_drive(frame,self.core.channels)
+        return (base+.05*torch.tanh(self.encoder(frame))) if self.learned_input else base
 
     def forward(self,x,state=None):
         if x.ndim!=3 or x.shape[1]<1:
             raise ValueError('nonempty batch x time x observation sequence required')
         outputs=[]
         for frame in x.unbind(1):
-            drive=observable_drive(frame,self.core.channels)
+            drive=self.input_drive(frame)
             # Five neural substeps per camera decision are a model choice;
             # frozen dynamics have no trainable physiological interpretation.
-            with torch.no_grad():
+            # Gradients may cross fixed anatomy to calibrate the sensory
+            # interface, but no core buffer becomes a trainable parameter.
+            with torch.set_grad_enabled(torch.is_grad_enabled() and self.learned_input):
                 for _ in range(5):state=self.core.step(drive,state)
                 dn=self.core.readout(state).float()
             features=(dn-self.feature_mean)/self.feature_scale.clamp_min(1e-8)
