@@ -9,6 +9,7 @@ import socket
 import subprocess
 import sys
 from threading import Event, Lock, Thread
+from .gallery import GalleryManager
 import time
 from urllib.request import urlopen
 import uuid
@@ -229,6 +230,7 @@ class LabServer:
         if host != '127.0.0.1':
             raise ValueError('lab must bind loopback')
         self.manager = manager
+        self.gallery = GalleryManager(manager.root)
         owner = self
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):
@@ -239,12 +241,24 @@ class LabServer:
                 self.send_response(status)
                 self.send_header('Content-Type','application/json')
                 self.send_header('Content-Length',str(len(data)))
+                self.send_header('Cache-Control','no-store')
                 self.end_headers()
                 self.wfile.write(data)
 
             def do_GET(self):
                 if self.path=='/api/lab/state':
                     self.reply(200,owner.manager.state())
+                elif self.path=='/api/gallery/maps':
+                    self.reply(200,owner.gallery.catalogue)
+                elif self.path=='/api/gallery/state':
+                    self.reply(200,owner.gallery.state())
+                elif self.path in ('/maps','/maps/','/maps/gallery.css','/maps/gallery.js'):
+                    filename={'/maps':'gallery.html','/maps/':'gallery.html','/maps/gallery.css':'gallery.css','/maps/gallery.js':'gallery.js'}[self.path]
+                    path=Path(__file__).with_name('static')/filename
+                    if not path.exists():self.reply(404,{'error':'gallery asset unavailable'});return
+                    data=path.read_bytes();self.send_response(200)
+                    self.send_header('Content-Type',{'gallery.html':'text/html; charset=utf-8','gallery.css':'text/css; charset=utf-8','gallery.js':'text/javascript; charset=utf-8'}[filename])
+                    self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(data)
                 elif self.path=='/':
                     data = Path(__file__).with_name('static').joinpath('lab.html').read_bytes()
                     self.send_response(200)
@@ -260,7 +274,7 @@ class LabServer:
                 if self.headers.get('Host') != expected or self.headers.get('Origin') not in (None,f'http://{expected}'):
                     self.reply(403,{'error':'local same-origin requests only'})
                     return
-                if self.path not in ('/api/lab/start','/api/lab/stop'):
+                if self.path not in ('/api/lab/start','/api/lab/stop','/api/gallery/start','/api/gallery/stop'):
                     self.reply(404,{'error':'not found'})
                     return
                 try:
@@ -271,7 +285,12 @@ class LabServer:
                     if self.headers.get('Content-Type','').split(';')[0] != 'application/json':
                         raise ValueError('expected application/json')
                     request = json.loads(self.rfile.read(length))
-                    if self.path.endswith('start'):
+                    if self.path=='/api/gallery/start':
+                        result=owner.gallery.start(request)
+                    elif self.path=='/api/gallery/stop':
+                        if request!={}:raise ValueError('stop accepts no fields')
+                        result=owner.gallery.stop()
+                    elif self.path.endswith('start'):
                         result = owner.manager.start(request)
                     else:
                         if request != {}:
@@ -292,11 +311,12 @@ class LabServer:
         try:
             self.http.serve_forever()
         finally:
+            self.gallery.close()
             self.manager.close()
             self.http.server_close()
 
 
-def run_lab(root,port=8765):
+def run_lab(root,port=8765,open_path='/'):
     import webbrowser
     url = f'http://127.0.0.1:{port}'
     try:
@@ -304,14 +324,14 @@ def run_lab(root,port=8765):
             existing = json.load(response)
         if existing.get('app')=='digital-fly-lab':
             if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
-                webbrowser.open(url)
+                webbrowser.open(url+open_path)
             return
     except (OSError,ValueError):
         pass
     server = LabServer(JobManager(root),port=port)
     print(f'Digital Fly Lab: {url} — keep this window open',flush=True)
     if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
-        webbrowser.open(url)
+        webbrowser.open(url+open_path)
     try:
         server.run()
     except KeyboardInterrupt:

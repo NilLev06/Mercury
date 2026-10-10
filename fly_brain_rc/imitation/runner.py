@@ -36,8 +36,8 @@ def fit_paired_replay(graph,trajectories,*,updates=100,seed=0):
 
 
 def collect_episode(env,model,*,steps,beta=None,emit=None,progress=None,
-                    cancel=None,viewer=None,mission=None):
-    teacher = BicycleTeacher(env) if beta is not None else None
+                    cancel=None,viewer=None,mission=None,teacher_factory=None):
+    teacher = (teacher_factory or BicycleTeacher)(env) if beta is not None else None
     detector,obstacle_detector = MockRedBallDetector(),MockBlueObstacleDetector()
     state = None
     observations,labels = [],[]
@@ -55,7 +55,8 @@ def collect_episode(env,model,*,steps,beta=None,emit=None,progress=None,
             sensor = env.sensor_frame()
             target = detector.detect(sensor,'red_ball')
             obstacle = obstacle_detector.detect(sensor,'obstacle')
-            features = torch.from_numpy(encode_observation(sensor,target,obstacle))
+            features = torch.from_numpy(encode_observation(sensor,target,obstacle,
+                                        schema=model.observation_schema))
             with torch.no_grad():
                 output,state = model(features[None,None],state)
             student = tuple(output[0,0].tolist())

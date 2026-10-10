@@ -5,8 +5,30 @@ MUJOCO_LOG.TXT
 .DS_Store
 .worktrees/
 .local/
-artifacts/imitation/
+# Keep selected models and reproducibility reports, not bulk training runs.
+artifacts/imitation/*
+!artifacts/imitation/connectome.pt
+!artifacts/imitation/connectome.best.pt
+!artifacts/imitation/versions/
+artifacts/imitation/versions/*
+!artifacts/imitation/versions/main-23of32.pt
+!artifacts/imitation/versions/original-pre-compass.pt
+!artifacts/imitation/versions/development-broad-round1.pt
+!artifacts/imitation/versions/manifest.json
+!artifacts/imitation/experiments/
+artifacts/imitation/experiments/*
+!artifacts/imitation/experiments/independent-paired-navigation-20261010/
+!artifacts/imitation/experiments/frozen-navigation-final2-20261009/
+artifacts/imitation/experiments/frozen-navigation-final2-20261009/*
+!artifacts/imitation/experiments/frozen-navigation-final2-20261009/result.json
+# Generated traces and old RL runtime data remain local.
+artifacts/rl/
+artifacts/diagnostics/**/*.trace.json
+artifacts/diagnostics/**/*.history.jsonl
+artifacts/diagnostics/**/*.before-run-*.json
 figures/*diagnostic*.png
 figures/*bicycle_*.png
 artifacts/evolution/checkpoint.json
 artifacts/evolution/**/checkpoint.json
+
+.venv/

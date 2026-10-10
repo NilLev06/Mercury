@@ -8,8 +8,12 @@ from .arrival import body_goal_distance
 
 
 class BicycleTeacher:
-    def __init__(self, env):
+    def __init__(self, env, *, cruise=.7, margin=.045):
+        if (type(cruise) not in (int,float) or not math.isfinite(cruise) or not .1<=cruise<=1
+                or type(margin) not in (int,float) or not math.isfinite(margin) or not 0<=margin<=.3):
+            raise ValueError('bounded positive cruise and nonnegative margin required')
         self.env = env
+        self.cruise,self.margin = cruise,margin
         self.path = self._plan()
         self.cursor = 0
         self.planned_pose = env.car_pose()
@@ -23,7 +27,8 @@ class BicycleTeacher:
                 return False
         return True
 
-    def _safe(self, state, margin=.045):
+    def _safe(self, state, margin=None):
+        if margin is None:margin=self.margin
         # The environment's exact chassis + outer wheel footprint, with a
         # modest lateral tracking margin. Goal sphere is not an obstacle.
         for lateral in (-margin,0,margin):
@@ -39,11 +44,11 @@ class BicycleTeacher:
         # A student's legal contact pose can already violate the optional
         # tracking margin. Requiring that margin on the first escape sample
         # traps the planner. Recovery still checks the full wheel footprint.
-        margin = .045 if self._safe(BicycleState(*start)) else 0.0
+        margin = self.margin if self._safe(BicycleState(*start)) else 0.0
         initial_state = env.state
         def initial_safe(state,direction,steering):
             for _ in range(5):
-                state = step_bicycle(state,.7*direction,steering,env.drive,env.drive.timestep)
+                state = step_bicycle(state,self.cruise*direction,steering,env.drive,env.drive.timestep)
                 if not self._safe(state,margin):
                     return False
             return True
@@ -153,18 +158,18 @@ class BicycleTeacher:
         length = max(.1,math.hypot(px-x,py-y))
         steering = math.atan(2*env.drive.wheelbase*math.sin(angle)/length)/env.drive.max_steer_rad
         # Brake early enough to settle inside the same scoring radius.
-        throttle = direction*min(.7,max(.12,(distance-.43)*2))
+        throttle = direction*min(self.cruise,max(.12,(distance-.43)*2))
         command = throttle,max(-1,min(1,steering))
         if not self._command_safe(*command):
             # A geometric A* route is not a guarantee that pure pursuit can
             # execute it at a grazing contact. Use a checked short backoff,
             # then plan from the new pose instead of teaching repeated impacts.
             for steer in (0.,-.5,.5,-1.,1.):
-                escape = -.7*direction,steer
+                escape = -self.cruise*direction,steer
                 if self._command_safe(*escape):
                     self.escape = ((x,y),escape)
                     return escape
             # Current forward momentum may require a blocked braking tick
             # before a reverse command becomes feasible.
-            return -.7*direction,0.
+            return -self.cruise*direction,0.
         return command

@@ -1,0 +1,2142 @@
+{
+  "protocol": {
+    "candidate_source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.pt",
+    "candidate_sha256": "e7155c9a2104a61f2936989a7d0b5b8bd2902e2e09ed2f1925c7c018958b5702",
+    "baseline": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/navigation-20261008/baseline.pt",
+    "baseline_sha256": "17c6eb06e6a02e0c2aa1e2e57cdab22ca9da751763535fd6de0a15c20274ee1b",
+    "final_seeds": [
+      950001,
+      950002,
+      950003,
+      950004
+    ],
+    "split": "final",
+    "stage": 2,
+    "simple_episodes": 16,
+    "complex_episodes": 32,
+    "minimum_complex_successes": 29,
+    "simple_metric": "clean_successes",
+    "complex_contacts_required": 0,
+    "old_clean_successes_required": 7,
+    "development_result": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.json",
+    "frozen_before_final_map_generation": true,
+    "deployed": false
+  },
+  "breakdown": {
+    "candidate": {
+      "simple": {
+        "episodes": 16,
+        "successes": 13,
+        "clean_successes": 13,
+        "contacts": 41
+      },
+      "complex": {
+        "episodes": 32,
+        "successes": 24,
+        "clean_successes": 23,
+        "contacts": 576
+      }
+    },
+    "baseline": {
+      "simple": {
+        "episodes": 16,
+        "successes": 14,
+        "clean_successes": 14,
+        "contacts": 43
+      },
+      "complex": {
+        "episodes": 32,
+        "successes": 3,
+        "clean_successes": 1,
+        "contacts": 3232
+      }
+    }
+  },
+  "reports": {
+    "candidate_old": {
+      "episodes": 7,
+      "successes": 7,
+      "contacts": 0,
+      "reports": [
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 730,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3619016155408939,
+          "final_goal_distance": 0.3619016155408939,
+          "final_speed": 0.01100841648876667,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "corridor",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 715,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3898641817917374,
+          "final_goal_distance": 0.3898641817917374,
+          "final_speed": 0.023546621203422546,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "single_cylinder",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 710,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.23205587290949492,
+          "final_goal_distance": 0.2532858963002639,
+          "final_speed": 0.027410794049501416,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "turn_corridor",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 885,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3931666373037278,
+          "final_goal_distance": 0.3931666373037278,
+          "final_speed": 0.015252750739455222,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "slalom",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 800,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3830511441488897,
+          "final_goal_distance": 0.3830511441488897,
+          "final_speed": 0.02406444065272808,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "blocked_goal",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 620,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4020254399544263,
+          "final_goal_distance": 0.4020254399544263,
+          "final_speed": 0.008754955418407916,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "imitation-eval-77-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 720,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.42061545614332196,
+          "final_goal_distance": 0.42061545614332196,
+          "final_speed": 0.023118657991290092,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "imitation-eval-77-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "old"
+        }
+      ]
+    },
+    "candidate": {
+      "episodes": 48,
+      "successes": 37,
+      "contacts": 617,
+      "reports": [
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 635,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.37363852932500835,
+          "final_goal_distance": 0.37363852932500835,
+          "final_speed": 0.004587980639189481,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 34.319999999999766,
+          "min_goal_distance": 0.4404012104744808,
+          "final_goal_distance": 0.5030843640211551,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 715,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.23470073415553142,
+          "final_goal_distance": 0.25359943226928583,
+          "final_speed": 0.026877636089920998,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 695,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.39753328782739705,
+          "final_goal_distance": 0.39753328782739705,
+          "final_speed": 0.01908988822251558,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 279,
+          "stalled_seconds": 38.30000000000039,
+          "min_goal_distance": 1.3778812469973882,
+          "final_goal_distance": 1.3778812469973882,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-4",
+          "start_pose": [
+            0.0,
+            0.02584235168252813,
+            0.016397489992081488
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 915,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.45045483103742023,
+          "final_goal_distance": 0.45045483103742023,
+          "final_speed": 0.014190899208188055,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.04953611132407337,
+            0.10425374820158093
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1105,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.39801046682290325,
+          "final_goal_distance": 0.39801046682290325,
+          "final_speed": 0.02205182313919067,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.0012822240797377427,
+            -0.032109045186438145
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1605,
+          "contacts": 2,
+          "stalled_seconds": 0.34,
+          "min_goal_distance": 0.1644709860477496,
+          "final_goal_distance": 0.4409793205685424,
+          "final_speed": 0.014022329449653625,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.019905203988881293,
+            -0.039124865952576485
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 25.919999999999536,
+          "min_goal_distance": 0.861932235432481,
+          "final_goal_distance": 0.8964208841813786,
+          "final_speed": 0.0007583501632325351,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.041943400169652596,
+            -0.11696475512922604
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1065,
+          "contacts": 0,
+          "stalled_seconds": 0.5400000000000001,
+          "min_goal_distance": 0.40999231322879715,
+          "final_goal_distance": 0.40999231322879715,
+          "final_speed": 0.008756060432642697,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.028429017906371812,
+            -0.08823278892113165
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1090,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3710736143520374,
+          "final_goal_distance": 0.3710736143520374,
+          "final_speed": 0.0230675496160984,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-10",
+          "start_pose": [
+            0.0,
+            0.008319370342865937,
+            -0.08425978647031179
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1135,
+          "contacts": 0,
+          "stalled_seconds": 0.34,
+          "min_goal_distance": 0.37339686828764646,
+          "final_goal_distance": 0.37339686828764646,
+          "final_speed": 0.003164601372554898,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-11",
+          "start_pose": [
+            0.0,
+            -0.055693207164373565,
+            -0.013448675233025315
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 490,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.40832706667483887,
+          "final_goal_distance": 0.40832706667483887,
+          "final_speed": 0.014942063763737677,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 3,
+          "stalled_seconds": 6.879999999999941,
+          "min_goal_distance": 0.425390032101558,
+          "final_goal_distance": 2.399740522651986,
+          "final_speed": 0.0002290345320943743,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 705,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.24248425470312132,
+          "final_goal_distance": 0.24944416404804906,
+          "final_speed": -0.028297360986471173,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 710,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.39735695233552326,
+          "final_goal_distance": 0.39735695233552326,
+          "final_speed": 0.017980469577014446,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 16.639999999999734,
+          "min_goal_distance": 0.51213042942489,
+          "final_goal_distance": 0.517923804462374,
+          "final_speed": -7.666647434234619e-06,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-4",
+          "start_pose": [
+            0.0,
+            0.058487554766329206,
+            0.042021532230705094
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 41.72000000000092,
+          "min_goal_distance": 1.8037568657267165,
+          "final_goal_distance": 1.8574641537475418,
+          "final_speed": -0.0014977617189288138,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.03143490675109113,
+            -0.11810254792652802
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1200,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4343009275478246,
+          "final_goal_distance": 0.4343009275478246,
+          "final_speed": 0.021747592836618423,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.031909685465959306,
+            -0.06212177521136018
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 940,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3889480276186314,
+          "final_goal_distance": 0.38968964649719084,
+          "final_speed": -0.007428314443677663,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.05961477225577837,
+            -0.036819404585004795
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 89,
+          "stalled_seconds": 28.95999999999947,
+          "min_goal_distance": 1.6230339093981816,
+          "final_goal_distance": 1.6239953115025565,
+          "final_speed": 0.033701108768582344,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-8",
+          "start_pose": [
+            0.0,
+            0.047784403873227674,
+            0.09943210778849909
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 955,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4597066028733738,
+          "final_goal_distance": 0.4597066028733738,
+          "final_speed": 0.0033325439784675833,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.04567784037814823,
+            0.009856206163896097
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 165,
+          "stalled_seconds": 39.16000000000052,
+          "min_goal_distance": 1.3942530233748938,
+          "final_goal_distance": 1.394396033255388,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-10",
+          "start_pose": [
+            0.0,
+            -0.02164587519723353,
+            0.11027242542406765
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 27.919999999999494,
+          "min_goal_distance": 0.5104459680350825,
+          "final_goal_distance": 0.5902962280838602,
+          "final_speed": 2.0861625671386717e-08,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-11",
+          "start_pose": [
+            0.0,
+            0.0419564853142219,
+            -0.07856899951948657
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 595,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.36598416960920077,
+          "final_goal_distance": 0.36598416960920077,
+          "final_speed": 0.009271240234374999,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 680,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.39630077209634823,
+          "final_goal_distance": 0.39630077209634823,
+          "final_speed": 0.007506186328828334,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 705,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.23295178705724903,
+          "final_goal_distance": 0.2517664003629964,
+          "final_speed": 0.02577500008046627,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 860,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3977338436770371,
+          "final_goal_distance": 0.3977338436770371,
+          "final_speed": 0.018857112899422643,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1080,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.38621278866782144,
+          "final_goal_distance": 0.38621278866782144,
+          "final_speed": 0.01323080025613308,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-4",
+          "start_pose": [
+            0.0,
+            -0.022449523165156623,
+            0.016645965428595283
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 41,
+          "stalled_seconds": 16.29999999999974,
+          "min_goal_distance": 0.11071672320568224,
+          "final_goal_distance": 1.1262347642090142,
+          "final_speed": -0.024273899197578427,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-5",
+          "start_pose": [
+            0.0,
+            -0.01707215764926348,
+            -0.010245562623975912
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1105,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.38747396851054583,
+          "final_goal_distance": 0.38747396851054583,
+          "final_speed": 0.022594958171248434,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-6",
+          "start_pose": [
+            0.0,
+            -0.02825299756299869,
+            -0.11828232650079455
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1085,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.45500111467998894,
+          "final_goal_distance": 0.45500111467998894,
+          "final_speed": 0.005496398825198412,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-7",
+          "start_pose": [
+            0.0,
+            -0.010780034337043928,
+            -0.1051979277297577
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1185,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.41224718853895265,
+          "final_goal_distance": 0.41224718853895265,
+          "final_speed": 0.02184444162994623,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.04254972761650904,
+            -0.0315799340832256
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 935,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.45510081831086024,
+          "final_goal_distance": 0.45510081831086024,
+          "final_speed": 0.019941796176135538,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.05948113500134762,
+            0.1123192998938759
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1045,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.394708080991885,
+          "final_goal_distance": 0.394708080991885,
+          "final_speed": 0.019361956417560576,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-10",
+          "start_pose": [
+            0.0,
+            0.014958569726399418,
+            0.021657176474437434
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 995,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4951359863090613,
+          "final_goal_distance": 0.49559556485186923,
+          "final_speed": -0.004674447188153862,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-11",
+          "start_pose": [
+            0.0,
+            0.03573713744121475,
+            0.06468631506272743
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 575,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3671117828838184,
+          "final_goal_distance": 0.3671117828838184,
+          "final_speed": 0.0062144527211785315,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 38,
+          "stalled_seconds": 13.839999999999794,
+          "min_goal_distance": 0.2850306260866338,
+          "final_goal_distance": 1.0518721056140847,
+          "final_speed": -0.01725410297513008,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 715,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.23519048762980033,
+          "final_goal_distance": 0.2523904804640302,
+          "final_speed": 0.02806771360337734,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 540,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.44075347107033136,
+          "final_goal_distance": 0.44075347107033136,
+          "final_speed": 0.009453055169433355,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1180,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3759948143634738,
+          "final_goal_distance": 0.3759948143634738,
+          "final_speed": 0.0004927825648337603,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-4",
+          "start_pose": [
+            0.0,
+            -0.043473501870715664,
+            0.1065915238806957
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1030,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.24265093064040674,
+          "final_goal_distance": 0.247705921060165,
+          "final_speed": -0.0046934227924793955,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.050088740097331955,
+            -0.06508860903926614
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1170,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.37947071262221527,
+          "final_goal_distance": 0.37947071262221527,
+          "final_speed": 0.02300427109003067,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.022639481051870927,
+            0.02809749814566978
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 965,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.39360777119318036,
+          "final_goal_distance": 0.39541931558892673,
+          "final_speed": -0.012885303050279616,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.02016399494486222,
+            0.1014548659313389
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1035,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.399255659415326,
+          "final_goal_distance": 0.399255659415326,
+          "final_speed": 0.021096467599272726,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.0022908435842920877,
+            -0.0661690209384537
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1000,
+          "contacts": 0,
+          "stalled_seconds": 0.32,
+          "min_goal_distance": 0.37012635810351074,
+          "final_goal_distance": 0.3705929753230288,
+          "final_speed": -0.004666865291073918,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.01693573998179071,
+            -0.11035086102740355
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1230,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4262415522909773,
+          "final_goal_distance": 0.4262415522909773,
+          "final_speed": 0.02203686013817787,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-10",
+          "start_pose": [
+            0.0,
+            -0.039427387979400624,
+            0.009398741441220548
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 925,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3949033067768531,
+          "final_goal_distance": 0.3949033067768531,
+          "final_speed": 0.004815748520195484,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-11",
+          "start_pose": [
+            0.0,
+            -0.0010568855818130218,
+            -0.003983488192791082
+          ],
+          "beta": null,
+          "family": "complex"
+        }
+      ]
+    },
+    "baseline": {
+      "episodes": 48,
+      "successes": 17,
+      "contacts": 3275,
+      "reports": [
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 525,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.40451201487669003,
+          "final_goal_distance": 0.40451201487669003,
+          "final_speed": 0.02195789888501167,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 537,
+          "contacts": 0,
+          "stalled_seconds": 1.9600000000000013,
+          "min_goal_distance": 0.4893412111612558,
+          "final_goal_distance": 0.4893412111612558,
+          "final_speed": 0.022240928560495376,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 560,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.26036027382321897,
+          "final_goal_distance": 0.26036027382321897,
+          "final_speed": 0.019610924273729322,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 685,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.3680629232570633,
+          "final_goal_distance": 0.3680629232570633,
+          "final_speed": 0.016803729161620137,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 38.920000000000485,
+          "min_goal_distance": 0.5427511029039326,
+          "final_goal_distance": 0.5427511029039326,
+          "final_speed": 2.258140593767166e-05,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-4",
+          "start_pose": [
+            0.0,
+            0.02584235168252813,
+            0.016397489992081488
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 174,
+          "stalled_seconds": 27.499999999999503,
+          "min_goal_distance": 2.0620075932902595,
+          "final_goal_distance": 2.062838527084362,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.04953611132407337,
+            0.10425374820158093
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 171,
+          "stalled_seconds": 39.58000000000059,
+          "min_goal_distance": 1.59646683325894,
+          "final_goal_distance": 1.5965812799935624,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.0012822240797377427,
+            -0.032109045186438145
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 980,
+          "contacts": 7,
+          "stalled_seconds": 1.540000000000001,
+          "min_goal_distance": 0.34079414751231685,
+          "final_goal_distance": 0.34079414751231685,
+          "final_speed": 0.02138917315751314,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.019905203988881293,
+            -0.039124865952576485
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 608,
+          "contacts": 0,
+          "stalled_seconds": 1.8800000000000012,
+          "min_goal_distance": 0.4941808521117992,
+          "final_goal_distance": 0.4941808521117992,
+          "final_speed": 0.01090995157137513,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.041943400169652596,
+            -0.11696475512922604
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 189,
+          "stalled_seconds": 40.76000000000077,
+          "min_goal_distance": 2.111551587677307,
+          "final_goal_distance": 2.11538345104533,
+          "final_speed": -0.0348370686173439,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.028429017906371812,
+            -0.08823278892113165
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 38.3600000000004,
+          "min_goal_distance": 1.4446267718645431,
+          "final_goal_distance": 1.4915899666053807,
+          "final_speed": 0.0037830132991075512,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-10",
+          "start_pose": [
+            0.0,
+            0.008319370342865937,
+            -0.08425978647031179
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 209,
+          "stalled_seconds": 29.399999999999462,
+          "min_goal_distance": 2.1904054869711627,
+          "final_goal_distance": 2.194325372114612,
+          "final_speed": -0.0494799792766571,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950001-2-complex-11",
+          "start_pose": [
+            0.0,
+            -0.055693207164373565,
+            -0.013448675233025315
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 535,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.2461656358236131,
+          "final_goal_distance": 0.24995514645018654,
+          "final_speed": -0.018502791225910184,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 41,
+          "stalled_seconds": 12.499999999999822,
+          "min_goal_distance": 1.2136857465767836,
+          "final_goal_distance": 1.2238353045741754,
+          "final_speed": 0.07252825796604156,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 565,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.22711458391087197,
+          "final_goal_distance": 0.24581108640417101,
+          "final_speed": 0.026003771275281903,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 615,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.38539235588232945,
+          "final_goal_distance": 0.38539235588232945,
+          "final_speed": 0.019029744155704974,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 2,
+          "stalled_seconds": 38.220000000000375,
+          "min_goal_distance": 2.2080064167252496,
+          "final_goal_distance": 2.4534144563133933,
+          "final_speed": -0.00988897643983364,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-4",
+          "start_pose": [
+            0.0,
+            0.058487554766329206,
+            0.042021532230705094
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 99,
+          "stalled_seconds": 17.859999999999708,
+          "min_goal_distance": 2.0478658742706934,
+          "final_goal_distance": 2.0528275113713854,
+          "final_speed": -0.08,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.03143490675109113,
+            -0.11810254792652802
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 91,
+          "stalled_seconds": 31.019999999999428,
+          "min_goal_distance": 1.5423842106133467,
+          "final_goal_distance": 1.5423842106133467,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.031909685465959306,
+            -0.06212177521136018
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 19,
+          "stalled_seconds": 21.279999999999635,
+          "min_goal_distance": 1.8592722604990524,
+          "final_goal_distance": 1.9905393617556149,
+          "final_speed": -0.036285285279154776,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.05961477225577837,
+            -0.036819404585004795
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 2,
+          "stalled_seconds": 37.380000000000244,
+          "min_goal_distance": 1.4642292421456868,
+          "final_goal_distance": 1.4808497010057946,
+          "final_speed": -0.0039568124804645775,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-8",
+          "start_pose": [
+            0.0,
+            0.047784403873227674,
+            0.09943210778849909
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 175,
+          "stalled_seconds": 24.439999999999568,
+          "min_goal_distance": 2.042920854577205,
+          "final_goal_distance": 2.0452404270900426,
+          "final_speed": -0.019102878496050833,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.04567784037814823,
+            0.009856206163896097
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 254,
+          "stalled_seconds": 22.179999999999616,
+          "min_goal_distance": 1.8112530789540269,
+          "final_goal_distance": 1.8240053279465134,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-10",
+          "start_pose": [
+            0.0,
+            -0.02164587519723353,
+            0.11027242542406765
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 214,
+          "stalled_seconds": 41.360000000000866,
+          "min_goal_distance": 2.1302914743732035,
+          "final_goal_distance": 2.1359538787133774,
+          "final_speed": 0.004323801724240184,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950002-2-complex-11",
+          "start_pose": [
+            0.0,
+            0.0419564853142219,
+            -0.07856899951948657
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 575,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.25572616934885,
+          "final_goal_distance": 0.25572616934885,
+          "final_speed": 0.02396547310054302,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 585,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.4176854893700043,
+          "final_goal_distance": 0.42145452749681855,
+          "final_speed": -0.02543813697993755,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 560,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.2581879438124655,
+          "final_goal_distance": 0.2581879438124655,
+          "final_speed": 0.01971953511238098,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 580,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.36470080218764633,
+          "final_goal_distance": 0.36470080218764633,
+          "final_speed": 0.018505714461207388,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 2,
+          "stalled_seconds": 34.439999999999785,
+          "min_goal_distance": 1.470207172601342,
+          "final_goal_distance": 1.6878301826992057,
+          "final_speed": -0.00037164713139645753,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-4",
+          "start_pose": [
+            0.0,
+            -0.022449523165156623,
+            0.016645965428595283
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 1145,
+          "contacts": 3,
+          "stalled_seconds": 3.0600000000000023,
+          "min_goal_distance": 0.33852882162520337,
+          "final_goal_distance": 0.33852882162520337,
+          "final_speed": 0.002905398281291127,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-5",
+          "start_pose": [
+            0.0,
+            -0.01707215764926348,
+            -0.010245562623975912
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 194,
+          "stalled_seconds": 22.03999999999962,
+          "min_goal_distance": 1.2949523877227336,
+          "final_goal_distance": 1.301070112358337,
+          "final_speed": -0.06509402990341186,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-6",
+          "start_pose": [
+            0.0,
+            -0.02825299756299869,
+            -0.11828232650079455
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 128,
+          "stalled_seconds": 17.039999999999726,
+          "min_goal_distance": 2.0542980910492488,
+          "final_goal_distance": 2.0542980910492488,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-7",
+          "start_pose": [
+            0.0,
+            -0.010780034337043928,
+            -0.1051979277297577
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 37,
+          "stalled_seconds": 29.49999999999946,
+          "min_goal_distance": 1.5518670293781307,
+          "final_goal_distance": 1.6627300630179331,
+          "final_speed": -0.0015942721627652645,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.04254972761650904,
+            -0.0315799340832256
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 225,
+          "stalled_seconds": 37.200000000000216,
+          "min_goal_distance": 1.9986931411648576,
+          "final_goal_distance": 2.0028764448317986,
+          "final_speed": -0.04607774019241333,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.05948113500134762,
+            0.1123192998938759
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 3,
+          "stalled_seconds": 36.84000000000016,
+          "min_goal_distance": 1.417315703805175,
+          "final_goal_distance": 1.461726510983815,
+          "final_speed": -0.010763751342892647,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-10",
+          "start_pose": [
+            0.0,
+            0.014958569726399418,
+            0.021657176474437434
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 23,
+          "stalled_seconds": 11.459999999999845,
+          "min_goal_distance": 1.8965246820683697,
+          "final_goal_distance": 1.940488126370444,
+          "final_speed": -0.09908763170242309,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950003-2-complex-11",
+          "start_pose": [
+            0.0,
+            0.03573713744121475,
+            0.06468631506272743
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 585,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.2785248168535073,
+          "final_goal_distance": 0.2785248168535073,
+          "final_speed": 0.021118359267711637,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-0",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 2,
+          "stalled_seconds": 42.72000000000108,
+          "min_goal_distance": 1.6299826410274822,
+          "final_goal_distance": 1.6856815613549947,
+          "final_speed": 0.00011079348623752593,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-1",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 565,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.25614152274253016,
+          "final_goal_distance": 0.25614152274253016,
+          "final_speed": 0.02091342508792877,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-2",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": true,
+          "cancelled": false,
+          "steps": 685,
+          "contacts": 0,
+          "stalled_seconds": 0.02,
+          "min_goal_distance": 0.23037547215424004,
+          "final_goal_distance": 0.23327606149325159,
+          "final_speed": -0.015733725950121877,
+          "stable_stop_seconds": 0.5000000000000001,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-simple-3",
+          "start_pose": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "beta": null,
+          "family": "simple"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 96,
+          "stalled_seconds": 29.51999999999946,
+          "min_goal_distance": 1.6336688929267085,
+          "final_goal_distance": 1.6393683869114444,
+          "final_speed": -0.039735302701592444,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-4",
+          "start_pose": [
+            0.0,
+            -0.043473501870715664,
+            0.1065915238806957
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 194,
+          "stalled_seconds": 46.18000000000162,
+          "min_goal_distance": 2.065586495344117,
+          "final_goal_distance": 2.066283698633367,
+          "final_speed": -0.002401594421826303,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-5",
+          "start_pose": [
+            0.0,
+            0.050088740097331955,
+            -0.06508860903926614
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 278,
+          "stalled_seconds": 38.64000000000044,
+          "min_goal_distance": 1.387796177960946,
+          "final_goal_distance": 1.3908360192986764,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-6",
+          "start_pose": [
+            0.0,
+            0.022639481051870927,
+            0.02809749814566978
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 13,
+          "stalled_seconds": 25.23999999999955,
+          "min_goal_distance": 1.8376392716077667,
+          "final_goal_distance": 2.023922372824467,
+          "final_speed": 0.013332156464457512,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-7",
+          "start_pose": [
+            0.0,
+            0.02016399494486222,
+            0.1014548659313389
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 0,
+          "stalled_seconds": 29.819999999999453,
+          "min_goal_distance": 0.9203217749616357,
+          "final_goal_distance": 1.003168062828283,
+          "final_speed": 0.008108366932719945,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-8",
+          "start_pose": [
+            0.0,
+            -0.0022908435842920877,
+            -0.0661690209384537
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 296,
+          "stalled_seconds": 36.60000000000012,
+          "min_goal_distance": 2.127180293156613,
+          "final_goal_distance": 2.127678892285233,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-9",
+          "start_pose": [
+            0.0,
+            0.01693573998179071,
+            -0.11035086102740355
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 93,
+          "stalled_seconds": 21.259999999999636,
+          "min_goal_distance": 2.0722579063988253,
+          "final_goal_distance": 2.119015262410385,
+          "final_speed": 0.0,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-10",
+          "start_pose": [
+            0.0,
+            -0.039427387979400624,
+            0.009398741441220548
+          ],
+          "beta": null,
+          "family": "complex"
+        },
+        {
+          "success": false,
+          "cancelled": false,
+          "steps": 2400,
+          "contacts": 41,
+          "stalled_seconds": 19.899999999999665,
+          "min_goal_distance": 1.9361193865604727,
+          "final_goal_distance": 1.9527321488733806,
+          "final_speed": -0.1110881358385086,
+          "stable_stop_seconds": 0.0,
+          "arrival_criterion": "body-centre-0.5m-speed0.03-hold0.5",
+          "scenario": "mixed-v1-final-950004-2-complex-11",
+          "start_pose": [
+            0.0,
+            -0.0010568855818130218,
+            -0.003983488192791082
+          ],
+          "beta": null,
+          "family": "complex"
+        }
+      ]
+    }
+  },
+  "accepted": false,
+  "deployed": false,
+  "frozen_candidate_verified": true,
+  "baseline_unchanged": true
+}

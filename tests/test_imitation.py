@@ -39,6 +39,21 @@ class ObservationTests(unittest.TestCase):
 
 
 class TeacherTests(unittest.TestCase):
+    def test_optional_training_teacher_respects_wider_margin_and_lower_cruise(self):
+        from fly_brain_rc.imitation.teacher import BicycleTeacher
+        from fly_brain_rc.config import DRIVE,SIM
+        from fly_brain_rc.sim.env import FlyCarEnv
+        from fly_brain_rc.sim.scenarios import get_scenario
+        from fly_brain_rc.sim.kinematics import BicycleState
+        env=FlyCarEnv(SIM,DRIVE,scenario=get_scenario('single_cylinder'),render=False)
+        teacher=BicycleTeacher(env,cruise=.45,margin=.12)
+        self.assertTrue(teacher.path)
+        for x,y,yaw,_,_ in teacher.path:
+            self.assertTrue(teacher._safe(BicycleState(x,y,yaw),.12))
+        self.assertLessEqual(abs(teacher.action()[0]),.45)
+        with self.assertRaises(ValueError):BicycleTeacher(env,cruise=0.)
+        with self.assertRaises(ValueError):BicycleTeacher(env,margin=-.1)
+
     def test_momentum_at_cylinder_allows_braking_before_recovery(self):
         from fly_brain_rc.imitation.teacher import BicycleTeacher
         from fly_brain_rc.imitation.curriculum import training_case,place_start
@@ -344,6 +359,10 @@ class TrainingTests(unittest.TestCase):
         before = {k:v.clone() for k,v in model.state_dict().items()}
         with patch('fly_brain_rc.imitation.runner.BicycleTeacher',side_effect=AssertionError('teacher leaked')):
             trajectory,report = collect_episode(env,model,steps=10,beta=None)
+            from unittest.mock import Mock
+            supplied=Mock(side_effect=AssertionError('custom teacher leaked'))
+            collect_episode(env,model,steps=10,beta=None,teacher_factory=supplied)
+            supplied.assert_not_called()
         self.assertIsNone(trajectory)
         self.assertEqual(report['steps'],10)
         for k,v in before.items():

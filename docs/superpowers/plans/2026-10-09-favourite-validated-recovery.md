@@ -1,0 +1,8 @@
+# Validated recovery from the favourite
+
+Approved experiment: start both arms from main-23of32 (e7155c9a…), preserve canonical files.
+1. Collect pure favourite rollouts on the first 32 training cases per tier plus old7.
+2. For failures rewind 30 decisions (3 seconds), replay the actual prefix exactly, and collect an executed teacher recovery. Follow the original validated demonstration route where possible; use footprint-safe A* when it is no longer nearby. Accept only stable arrival with zero contacts throughout prefix and recovery. Prefix observations provide recurrent context, only suffix labels contribute loss.
+3. Share the same fixed 709 clean demonstrations and validated corrections between arms. Corrections occur four times in the sampling pool. Retain 21 favourite anchors with weight4. Full-history differentiation, no cached states. Four stages of 200 updates, matched sampling seeds. Frozen arm: residual motor head only, Adam1e-4. Live arm: all existing neural parameters, Adam1e-5; graph mask unchanged. This compares practical training configurations, not a pure causal effect of scope because learning rates differ.
+4. Evaluate every stage autonomously on old7, prior complex6 and development seeds1030001..8. Retain the existing strict gate: old7/prior complex6 clean, complex>=58/64 and zero contacts on all64, simple>=30/32 clean and contacts<=515. Do not open final1040001..8 unless a candidate passes. No automatic promotion.
+5. Test collection, context masking, frozen parameters and route cusps; independent code review. Record outcomes and model hashes. Final inference remains the ordinary neural policy without teacher or recovery rules.
