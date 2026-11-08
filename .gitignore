@@ -32,3 +32,14 @@ artifacts/evolution/checkpoint.json
 artifacts/evolution/**/checkpoint.json
 
 .venv/
+
+# Editor state, local credentials and generated outputs.
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.idea/
+.vscode/
+*.log

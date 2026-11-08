@@ -329,7 +329,7 @@ def run_lab(root,port=8765,open_path='/'):
     except (OSError,ValueError):
         pass
     server = LabServer(JobManager(root),port=port)
-    print(f'Digital Fly Lab: {url} — keep this window open',flush=True)
+    print(f'Mercury: {url} — keep this window open',flush=True)
     if not os.environ.get('DIGITAL_FLY_NO_BROWSER'):
         webbrowser.open(url+open_path)
     try:

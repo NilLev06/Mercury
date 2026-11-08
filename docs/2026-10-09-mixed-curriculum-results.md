@@ -44,10 +44,10 @@
 
 ## Артефакты и проверки
 
-- Новый кандидат: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/mixed-curriculum-20261009/trial/selected.pt`.
-- Его память обучения: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/mixed-curriculum-20261009/trial/replay-1.pt`.
-- Полные итоговые проезды: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/mixed-curriculum-20261009/trial/result.json`.
-- Проверка целостности: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/mixed-curriculum-20261009/trial/integrity.json`.
+- Новый кандидат: `artifacts/imitation/experiments/mixed-curriculum-20261009/trial/selected.pt`.
+- Его память обучения: `artifacts/imitation/experiments/mixed-curriculum-20261009/trial/replay-1.pt`.
+- Полные итоговые проезды: `artifacts/imitation/experiments/mixed-curriculum-20261009/trial/result.json`.
+- Проверка целостности: `artifacts/imitation/experiments/mixed-curriculum-20261009/trial/integrity.json`.
 - Команда эксперимента реализована в `scripts/train_mixed_curriculum.py`; требует новой выходной папки и доступа MuJoCo к графике macOS.
 - Новые карты пока доступны через эксперимент, меню пульта не менялось.
 - 339 тестов проекта прошли. Тест долей смеси проверен на намеренно неверной реализации: при игнорировании долей он падает, после восстановления проходит.

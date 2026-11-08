@@ -3,7 +3,9 @@ import sys, json, math, shutil, hashlib
 from pathlib import Path
 from contextlib import nullcontext
 from unittest.mock import patch
-sys.path.insert(0, '/Users/leonard/Desktop/DigitalFlyCar')
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.bypass_learning import train_bypass, bypass_cases
 from fly_brain_rc.sim.env import FlyCarEnv
@@ -15,7 +17,7 @@ from fly_brain_rc.contracts import MotionObservation
 from fly_brain_rc.perception.target import MockRedBallDetector, MockBlueObstacleDetector
 
 root = Path(__file__).parent
-source = Path('/Users/leonard/Desktop/DigitalFlyCar/artifacts/rl/bypass-policy.json')
+source = Path(str(ROOT / 'artifacts/rl/bypass-policy.json'))
 original_state = RLController._policy_state
 original_values = QLearningAgent.values
 

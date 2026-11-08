@@ -1,0 +1,23 @@
+{
+  "config_id": "config-09",
+  "config": {
+    "goal_gain": 2.0,
+    "front_margin": 0.45,
+    "brake_area": 0.6,
+    "avoid_gain": 1.0,
+    "cruise": 0.62,
+    "stop_range": 0.13,
+    "bypass_hold": 0.6,
+    "bypass_distance": 0.65,
+    "retreat_duration": 0.7,
+    "rear_margin": 0.2
+  },
+  "code": {
+    "controller.py": "447a9a94dc21746f818d5f2209ffa44ea49877c97fc8ce42970cf455831d9207",
+    "experiment.py": "0c56940fd4b844be7046454899f278566cbb3f3f4db50f1a9ea67306c856a053"
+  },
+  "development_manifest_sha256": "3828f486dc9de05381d610c58902f4c052cd4e25f8b0ae5ec7ef313dc047ebea",
+  "checkpoint_sha256": "e7155c9a2104a61f2936989a7d0b5b8bd2902e2e09ed2f1925c7c018958b5702",
+  "development_reports": 384,
+  "selected_before_final": true
+}

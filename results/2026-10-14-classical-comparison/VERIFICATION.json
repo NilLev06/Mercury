@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "final_reports": 192,
+  "unique_scenes": 96,
+  "paired": true,
+  "checkpoint_unchanged": true,
+  "source_snapshot_unchanged": true,
+  "selection_unchanged": true,
+  "code_unchanged": true,
+  "final_reports_sha256": "e9c68db2006a31cffdef00b54723a13fa70ee849b089eaa2a0ac2a7153161700"
+}

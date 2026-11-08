@@ -4,47 +4,47 @@
   "models": [
     {
       "name": "main-23of32",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/main-23of32.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/frozen-navigation-final2-20261009/selected.pt",
+      "path": "artifacts/imitation/versions/main-23of32.pt",
+      "source": "artifacts/imitation/experiments/frozen-navigation-final2-20261009/selected.pt",
       "sha256": "e7155c9a2104a61f2936989a7d0b5b8bd2902e2e09ed2f1925c7c018958b5702"
     },
     {
       "name": "original-pre-compass",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/original-pre-compass.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/navigation-20261008/baseline.pt",
+      "path": "artifacts/imitation/versions/original-pre-compass.pt",
+      "source": "artifacts/imitation/experiments/navigation-20261008/baseline.pt",
       "sha256": "17c6eb06e6a02e0c2aa1e2e57cdab22ca9da751763535fd6de0a15c20274ee1b"
     },
     {
       "name": "development-broad-round1",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/development-broad-round1.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/broad-neural-dagger-20261009/candidate-1.pt",
+      "path": "artifacts/imitation/versions/development-broad-round1.pt",
+      "source": "artifacts/imitation/experiments/broad-neural-dagger-20261009/candidate-1.pt",
       "sha256": "6d916c8804d367a1ddec157720157ca6a15a3eb824da511e83c2d57154165d9d"
     }
   ],
-  "backup": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/backups/before-main-23of32-20261009",
+  "backup": "artifacts/imitation/backups/before-main-23of32-20261009",
   "previous_files": [
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.best.evaluation-0.json",
+      "path": "artifacts/imitation/connectome.best.evaluation-0.json",
       "sha256": "66070b5f1177b3bfb75181f7905d47bcbaec1b522d7ca3daa2ecae5bf70afecf"
     },
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.pt",
+      "path": "artifacts/imitation/connectome.pt",
       "sha256": "5ab54ad573e09c842e94e17dab9221e8d4d9a97b8bfaf4be8296f99c11d7e9ad"
     },
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.best.pt",
+      "path": "artifacts/imitation/connectome.best.pt",
       "sha256": "17c6eb06e6a02e0c2aa1e2e57cdab22ca9da751763535fd6de0a15c20274ee1b"
     },
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.history.jsonl",
+      "path": "artifacts/imitation/connectome.history.jsonl",
       "sha256": "8ca4da3ff16dadee8ad88b78eb4ac2e3bee8c0419175e07d57117096e09a0388"
     },
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.validation.json",
+      "path": "artifacts/imitation/connectome.validation.json",
       "sha256": "1e6bcb085edfa76a2480a164a93fd9b6ac00ae66770d2a1cf179d2156faa3f41"
     },
     {
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/connectome.evaluation-0.json",
+      "path": "artifacts/imitation/connectome.evaluation-0.json",
       "sha256": "54727a5564019cd6702640633e1db46cf1c1cae95a65662630d16381bcedba63"
     }
   ],
@@ -84,25 +84,25 @@
   "retired_models": [
     {
       "name": "previous-final-27of32",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/previous-final-27of32.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/frozen-navigation-final-20261009/selected.pt",
+      "path": "artifacts/imitation/versions/previous-final-27of32.pt",
+      "source": "artifacts/imitation/experiments/frozen-navigation-final-20261009/selected.pt",
       "sha256": "1efdc4e9e47822dc1b1cde4b00dbf569e3d17d28f194dd8268d09f648430306f",
       "removed_by_cleanup": true
     },
     {
       "name": "development-complex-30",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/development-complex-30.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/navigation-milestones-20261009/complex-30.pt",
+      "path": "artifacts/imitation/versions/development-complex-30.pt",
+      "source": "artifacts/imitation/experiments/navigation-milestones-20261009/complex-30.pt",
       "sha256": "d26dfba3941bdd5c525313ee690869ea06aa08b86bb560e9d530e570dc39a941",
       "removed_by_cleanup": true
     },
     {
       "name": "development-safe-balanced",
-      "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/development-safe-balanced.pt",
-      "source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/navigation-milestones-20261009/safe-balanced.pt",
+      "path": "artifacts/imitation/versions/development-safe-balanced.pt",
+      "source": "artifacts/imitation/experiments/navigation-milestones-20261009/safe-balanced.pt",
       "sha256": "43cc7f33a81e4bbec215b857b3437cda03fcd6259be5caf0f6cd7cccc4c50a90",
       "removed_by_cleanup": true
     }
   ],
-  "cleanup_report": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/cleanup-20261009.json"
+  "cleanup_report": "artifacts/imitation/versions/cleanup-20261009.json"
 }

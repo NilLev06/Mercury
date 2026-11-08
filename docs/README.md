@@ -2,6 +2,9 @@
 
 Текущее состояние:
 
+- [Mercury: сравнение с реактивным контроллером, 14 октября 2026](../results/2026-10-14-classical-comparison/README.md).
+- [Проверка сохранённых результатов](../scripts/verify_saved_results.py).
+
 - [Живая галерея 231 карты](2026-10-10-live-map-gallery.md).
 - [Независимое сравнение моделей](2026-10-10-independent-navigation-results.md).
 - [Версии моделей и прежняя уборка](2026-10-09-model-versions-and-cleanup.md).
