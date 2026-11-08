@@ -31,7 +31,7 @@ Mercury получает изображение камеры и показани
 Проверенное окружение: Python 3.11, macOS. Для установки нужен Python с доступными пакетами PyTorch и MuJoCo.
 
 ```bash
-git clone https://github.com/NilLev06/DigitalFlyCar.git Mercury
+git clone https://github.com/NilLev06/Mercury.git Mercury
 cd Mercury
 python3 -m venv .venv
 source .venv/bin/activate
