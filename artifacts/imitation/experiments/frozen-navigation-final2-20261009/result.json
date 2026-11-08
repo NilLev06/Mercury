@@ -1,8 +1,8 @@
 {
   "protocol": {
-    "candidate_source": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.pt",
+    "candidate_source": "artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.pt",
     "candidate_sha256": "e7155c9a2104a61f2936989a7d0b5b8bd2902e2e09ed2f1925c7c018958b5702",
-    "baseline": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/navigation-20261008/baseline.pt",
+    "baseline": "artifacts/imitation/experiments/navigation-20261008/baseline.pt",
     "baseline_sha256": "17c6eb06e6a02e0c2aa1e2e57cdab22ca9da751763535fd6de0a15c20274ee1b",
     "final_seeds": [
       950001,
@@ -18,7 +18,7 @@
     "simple_metric": "clean_successes",
     "complex_contacts_required": 0,
     "old_clean_successes_required": 7,
-    "development_result": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.json",
+    "development_result": "artifacts/imitation/experiments/neural-scope-full-blend-20261009/candidate-0.5.json",
     "frozen_before_final_map_generation": true,
     "deployed": false
   },

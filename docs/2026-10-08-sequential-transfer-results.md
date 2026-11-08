@@ -37,9 +37,9 @@
 
 ## Файлы и проверки
 
-- Кандидат: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/sequential-transfer-20261008/scales/candidate-0.75.pt`.
-- Полные наблюдения и память обучения: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/sequential-transfer-20261008/replay-2.pt`.
-- Итоговые проезды: `/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/sequential-transfer-20261008/scales/result.json`.
+- Кандидат: `artifacts/imitation/experiments/sequential-transfer-20261008/scales/candidate-0.75.pt`.
+- Полные наблюдения и память обучения: `artifacts/imitation/experiments/sequential-transfer-20261008/replay-2.pt`.
+- Итоговые проезды: `artifacts/imitation/experiments/sequential-transfer-20261008/scales/result.json`.
 - Повторение эксперимента: `scripts/train_sequential.py`; выходная папка должна быть новой. Отбор масштаба сохранён в `select_scales.py` в папке эксперимента.
 - Новые карты пока доступны через эксперимент, меню пульта не менялось.
 - 337 тестов проекта прошли; штатная загрузка всех кандидатов и неизменность коннектома проверены.

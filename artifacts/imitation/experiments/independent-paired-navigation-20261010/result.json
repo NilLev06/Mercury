@@ -2,11 +2,11 @@
   "protocol": {
     "models": {
       "source": {
-        "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/versions/main-23of32.pt",
+        "path": "artifacts/imitation/versions/main-23of32.pt",
         "sha256": "e7155c9a2104a61f2936989a7d0b5b8bd2902e2e09ed2f1925c7c018958b5702"
       },
       "candidate": {
-        "path": "/Users/leonard/Desktop/DigitalFlyCar/artifacts/imitation/experiments/favourite-recovery-distillation-20261009/live-3.pt",
+        "path": "artifacts/imitation/experiments/favourite-recovery-distillation-20261009/live-3.pt",
         "sha256": "b419701511c6a0296f4dc49bd7df223f552c817233596e75ab4feef7fe7f6356"
       }
     },

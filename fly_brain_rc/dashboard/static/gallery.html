@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light"><title>Fly Navigation Lab · Галерея карт</title>
+<meta name="color-scheme" content="light"><title>Mercury · Галерея карт</title>
 <link rel="stylesheet" href="/maps/gallery.css"><script src="/maps/gallery.js" defer></script>
 </head>
 <body>
-<header class="header"><a class="brand" href="/maps"><span class="brand-mark" aria-hidden="true">✳</span><span>Fly Navigation Lab<small>ЛОКАЛЬНАЯ НЕЙРОННАЯ НАВИГАЦИЯ</small></span></a><div class="header-right"><a href="/">Лаборатория ↗</a><span id="connection" class="connection">Соединение…</span></div></header>
+<header class="header"><a class="brand" href="/maps"><span class="brand-mark" aria-hidden="true">✳</span><span>Mercury<small>ЛОКАЛЬНАЯ НЕЙРОННАЯ НАВИГАЦИЯ</small></span></a><div class="header-right"><a href="/">Лаборатория ↗</a><span id="connection" class="connection">Соединение…</span></div></header>
 <main>
-<section class="intro"><div><p class="eyebrow">ГАЛЕРЕЯ ЭКСПЕРИМЕНТОВ</p><h1>Одна муха. Множество путей.</h1><p>Выберите карту и наблюдайте, как сохранённая нейросеть ведёт машину в MuJoCo.</p></div><div class="model"><span class="eyebrow">ФИКСИРОВАННАЯ МОДЕЛЬ</span><strong id="model-label">Загрузка модели…</strong><span id="model-detail">255 нейронов · рекуррентная сеть</span><details><summary>Идентификатор весов</summary><code id="model-hash">—</code></details></div></section>
+<section class="intro"><div><p class="eyebrow">ГАЛЕРЕЯ ЭКСПЕРИМЕНТОВ</p><h1>Mercury: навигация на коннектомной сети</h1><p>Выберите карту и наблюдайте, как сохранённая нейросеть ведёт машину в MuJoCo.</p></div><div class="model"><span class="eyebrow">ФИКСИРОВАННАЯ МОДЕЛЬ</span><strong id="model-label">Загрузка модели…</strong><span id="model-detail">255 нейронов · рекуррентная сеть</span><details><summary>Идентификатор весов</summary><code id="model-hash">—</code></details></div></section>
 <div id="error" class="error" role="alert" hidden></div>
 <div class="workspace">
 <aside class="catalogue panel" aria-label="Каталог карт"><div class="catalogue-heading"><h2>Карты <span id="total" class="count">—</span></h2><span id="matches" class="subtle"></span></div><label class="search"><span class="sr-only">Поиск по названию или идентификатору</span><input id="search" type="search" placeholder="Найти карту или ID…" autocomplete="off"></label><div class="filters"><label>Набор<select id="group"><option value="all">Все наборы</option></select></label><label>Результат<select id="outcome"><option value="all">Все результаты</option><option value="clean">Чистое прибытие</option><option value="contact">Прибытие с контактами</option><option value="timeout">Без прибытия</option><option value="unknown">Нет истории</option><option value="session">Запущены сейчас</option></select></label></div><div id="cards" class="cards" aria-label="Выбрать карту"></div><p id="empty-catalogue" class="empty-catalogue" hidden>Карты не найдены. Измените фильтр или запрос.</p><div class="catalogue-foot">Все карты, включая неудачные проезды.<br>История проверки и новые запуски показаны отдельно.</div></aside>

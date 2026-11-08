@@ -1,7 +1,7 @@
 # Task 9 checkpoint — work paused at user request
 
 Interpreter: `/opt/miniconda3/envs/flybrain/bin/python`. Worktree:
-`/Users/leonard/Desktop/DigitalFlyCar/.worktrees/neural-fly-brain`.
+`.worktrees/neural-fly-brain`.
 Delivery/persistence changes are committed separately at `287c86a`.
 Tuning edits are saved as a runnable version-2 checkpoint. Task 9 acceptance
 is **not complete**. The unverified threat-turn prototype is saved separately

@@ -1,6 +1,8 @@
 import sys, json, math
 from pathlib import Path
-sys.path.insert(0, '/Users/leonard/Desktop/DigitalFlyCar')
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 from fly_brain_rc.config import SIM, DRIVE
 from fly_brain_rc.sim.env import FlyCarEnv
 from fly_brain_rc.sim.scenarios import Scenario
@@ -10,7 +12,7 @@ from fly_brain_rc.bypass_learning import BypassReward
 from fly_brain_rc.perception.target import MockRedBallDetector, MockBlueObstacleDetector
 
 root = Path(__file__).parent
-agent = QLearningAgent.load('/Users/leonard/Desktop/DigitalFlyCar/artifacts/rl/bypass-policy.json')
+agent = QLearningAgent.load(str(ROOT / 'artifacts/rl/bypass-policy.json'))
 td, od = MockRedBallDetector(), MockBlueObstacleDetector()
 scenario = Scenario('straight-probe', (), (2.3, 0))
 camera = FlyCarEnv(SIM, DRIVE, scenario=scenario)
